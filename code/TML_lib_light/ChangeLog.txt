@@ -1,0 +1,25 @@
+4 May 2018
+-----------
+- added licensing information 
+
+
+5 February 2018
+-----------
+- corect files included in the archive
+
+31 January 2018
+-----------
+- Add, ptotype functions for send/receive TML messages. 
+- Fix, set data type according with C99. 
+
+25 January 2017
+-----------
+- Fix, set the operation code for write operation to RAM based on the memory page where the memory address is. 
+
+11 October 2016
+-----------
+- Added support for RS232 communication
+
+20 May 2015
+-----------
+- First release of TML_lib_light
