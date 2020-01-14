@@ -36,8 +36,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../../cansock_interface/cansock.h"
 
-#define RS232_COM	// comment the definition for TMLCAN communication
+//#define RS232_COM	// comment the definition for TMLCAN communication
 
 #undef LOBYTE
 #define LOBYTE(x)    ((uint8_t)(x))
@@ -114,50 +115,50 @@ bool TSL_TML_to_TMLCAN(uint16_t AxisID, TML_INSTR *TML_instruction, CAN_MSG *CAN
 bool TSL_TML_to_RS232(uint16_t AxisID, TML_INSTR *TML_instruction, RS232_MSG *RS232_message);
 
 /*The function reads a status register from the drive*/
-bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t *RegisterValue);
+bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t *RegisterValue, int fd);
 
 /*The function sends the ENDINIT instruction*/
-bool TSL_InitializeDrive(uint16_t AxisID);
+bool TSL_InitializeDrive(uint16_t AxisID, int fd);
 
 /*The function reads MER.2 to determine if the setup table is valid or not*/
-bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus);
+bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus, int fd);
 
 /*The function enables/disables the power stage of the drive */
-bool TSL_Power(uint16_t AxisID, bool PowerSwitch);
+bool TSL_Power(uint16_t AxisID, bool PowerSwitch, int fd);
 
 /*The function reads the functions table generated from EasyMotion Studio and stored in the non-volatile memory of the drive */
-bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8_t* FunctionNo);
+bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8_t* FunctionNo, int fd);
 
 /*The function triggers the execution of the TML function stored on the drive */
-bool TSL_StartFunction(uint16_t AxisID, uint16_t FunctionAddress);
+bool TSL_StartFunction(uint16_t AxisID, uint16_t FunctionAddress, int fd);
 
 /*The function sends the TML command to the drive */
-bool TSL_ExecuteTML(uint16_t AxisID, uint16_t OpCode, uint16_t TMLData1, uint16_t TMLData2, uint16_t TMLData3, uint16_t TMLData4, uint8_t NOWords);
+bool TSL_ExecuteTML(uint16_t AxisID, uint16_t OpCode, uint16_t TMLData1, uint16_t TMLData2, uint16_t TMLData3, uint16_t TMLData4, uint8_t NOWords, int fd);
 
 /*The function set/reset the output of the drive */
-bool TSL_SetOutput(uint16_t AxisID, uint8_t nIO, uint8_t OutValue);
+bool TSL_SetOutput(uint16_t AxisID, uint8_t nIO, uint8_t OutValue, int fd);
 
 /*The function reads the input of the drive */
-bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue);
+bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue, int fd);
 
 /*read INSTATUS variable from the drive and apply a mask on it to retrieve the input state*/
 
-bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t writeValue);
+bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t writeValue, int fd);
 
-bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t writeValue);
+bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t writeValue, int fd);
 
-bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t* readValue);
+bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t* readValue, int fd);
 
-bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t* readValue);
+bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t* readValue, int fd);
 
-bool TSL_SetCANBaudRate(uint16_t AxisID, uint32_t Baudrate);
+bool TSL_SetCANBaudRate(uint16_t AxisID, uint32_t Baudrate, int fd);
 
 #ifndef RS232_COM
-	extern bool SendMessage(CAN_MSG * CAN_TX_message);
-	extern bool ReceiveMessage(CAN_MSG * CAN_RX_message);
+	extern int SendMessage(CAN_MSG * CAN_TX_message, int fd);
+	extern int ReceiveMessage(CAN_MSG * CAN_RX_message, int fd);
 #else
-	extern bool SendMessage(RS232_MSG * RS232_TX_message);
-	extern bool ReceiveMessage(RS232_MSG * RS232_RX_message);
+	extern int SendMessage(RS232_MSG * RS232_TX_message);
+	extern int ReceiveMessage(RS232_MSG * RS232_RX_message);
 #endif
 
 #ifdef __cplusplus

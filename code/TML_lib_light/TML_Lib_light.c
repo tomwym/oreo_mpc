@@ -35,7 +35,7 @@
 #include "./include/TML_lib_light.h"
 #include "./include/TML_instructions.h"
 
-bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t * RegisterValue)
+bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t * RegisterValue, int fd)
 {
 	#ifndef RS232_COM
 		CAN_MSG CAN_RX_message;
@@ -76,11 +76,11 @@ bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t * RegisterValue
 		/*Send the message with the TML instruction - HW dependent*/
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;	
 #endif
 
@@ -88,7 +88,7 @@ bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t * RegisterValue
 
 	/*Decode the received message - HW dependent*/
 	#ifndef RS232_COM
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;
 		*RegisterValue = ((uint16_t)CAN_RX_message.CAN_data[3] << 8) | CAN_RX_message.CAN_data[2];
 
@@ -102,7 +102,7 @@ bool TSL_ReadStatus(uint16_t AxisID, uint16_t Register, uint16_t * RegisterValue
 
 }
 
-bool TSL_InitializeDrive(uint16_t AxisID)
+bool TSL_InitializeDrive(uint16_t AxisID, int fd)
 {
 #ifndef RS232_COM
 		CAN_MSG CAN_TX_message;
@@ -118,18 +118,18 @@ bool TSL_InitializeDrive(uint16_t AxisID)
 		/*Send the message with the TML instruction - HW dependent*/
 	#ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 	#else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);		
-		if (!SendMessage(&RS232_TX_message))	
+		if (SendMessage(&RS232_TX_message) < 0)	
 			return false;
 	#endif	
 
 	return true;
 }
 
-bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus)
+bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus, int fd)
 {
 	#ifndef RS232_COM
 		CAN_MSG CAN_RX_message;
@@ -153,11 +153,11 @@ bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus)
 	/*Send the message with the TML instruction - HW dependent*/
 	#ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 	#else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))	
+		if (SendMessage(&RS232_TX_message) < 0)	
 			return false;
 	#endif
 
@@ -165,7 +165,7 @@ bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus)
 	
 	/*Decode the received message - HW dependent*/
 	#ifndef RS232_COM
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;
 		*SetupTableStatus = !((((uint16_t)CAN_RX_message.CAN_data[3] << 8) | CAN_RX_message.CAN_data[2]) & 0x0004);
 	#else
@@ -176,7 +176,7 @@ bool TSL_CheckSetupTable(uint16_t AxisID, bool *SetupTableStatus)
 	return true;
 }
 
-bool TSL_Power(uint16_t AxisID, bool PowerSwitch)
+bool TSL_Power(uint16_t AxisID, bool PowerSwitch, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -192,18 +192,18 @@ bool TSL_Power(uint16_t AxisID, bool PowerSwitch)
 	/*Send the message with the TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
 	return true;
 }
 
-bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8_t* FunctionNo)
+bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8_t* FunctionNo, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_RX_message;
@@ -230,11 +230,11 @@ bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8
 	/*Send the message with the TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
@@ -244,7 +244,7 @@ bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8
 #ifndef RS232_COM
 	if ((CAN_RX_message.identifier & 0x000000FF) == AxisID)
 	{
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;
 
 		FunctionTableEEPROM = ((uint16_t)CAN_RX_message.CAN_data[3] << 8)|CAN_RX_message.CAN_data[2];
@@ -278,11 +278,11 @@ bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8
 		/*Send the message with TML instruction - HW dependent*/		
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;	
 #endif
 
@@ -292,7 +292,7 @@ bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8
 #ifndef RS232_COM
 		if ((CAN_RX_message.identifier & 0x000000FF) == AxisID)
 		{		
-			if (!ReceiveMessage(&CAN_RX_message))
+			if (!ReceiveMessage(&CAN_RX_message, fd))
 				return false;
 
 			tmpFunctionAddress = ((uint16_t)CAN_RX_message.CAN_data[3] << 8) | CAN_RX_message.CAN_data[2];
@@ -334,7 +334,7 @@ bool TSL_ReadFunctionsTable(uint16_t AxisID, uint16_t* FunctionsAddresses, uint8
 }
 
 
-bool TSL_StartFunction(uint16_t AxisID, uint16_t FunctionAddress)
+bool TSL_StartFunction(uint16_t AxisID, uint16_t FunctionAddress, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -357,18 +357,18 @@ bool TSL_StartFunction(uint16_t AxisID, uint16_t FunctionAddress)
 	/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
 	return true;
 }
 
-bool TSL_ExecuteTML(uint16_t AxisID, uint16_t OpCode, uint16_t TMLData1, uint16_t TMLData2, uint16_t TMLData3, uint16_t TMLData4, uint8_t NOWords)
+bool TSL_ExecuteTML(uint16_t AxisID, uint16_t OpCode, uint16_t TMLData1, uint16_t TMLData2, uint16_t TMLData3, uint16_t TMLData4, uint8_t NOWords, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message; 
@@ -387,18 +387,18 @@ bool TSL_ExecuteTML(uint16_t AxisID, uint16_t OpCode, uint16_t TMLData1, uint16_
 	/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
 	return true;
 }
 
-bool TSL_SetOutput(uint16_t AxisID, uint8_t nIO, uint8_t OutValue)
+bool TSL_SetOutput(uint16_t AxisID, uint8_t nIO, uint8_t OutValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -420,18 +420,18 @@ bool TSL_SetOutput(uint16_t AxisID, uint8_t nIO, uint8_t OutValue)
 	/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
 	return true;
 }
 
-bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue)
+bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -460,11 +460,11 @@ bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue)
 	/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 	TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-	if (!SendMessage(&CAN_TX_message))
+	if (SendMessage(&CAN_TX_message, fd) < 0)
 		return false;
 #else
 	TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-	if (!SendMessage(&RS232_TX_message))
+	if (SendMessage(&RS232_TX_message) < 0)
 		return false;	
 #endif
 
@@ -474,7 +474,7 @@ bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue)
 #ifndef RS232_COM
 	if ((CAN_RX_message.identifier & 0x000000FF) == AxisID)
 	{
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;
 		*InValue = (bool)((((uint16_t)CAN_RX_message.CAN_data[3] << 8) | CAN_RX_message.CAN_data[2]) & (uint16_t)(1<<nIO));
 	}
@@ -489,7 +489,7 @@ bool TSL_ReadInput(uint16_t AxisID, uint8_t nIO, bool* InValue)
 	return true;
 }
 
-bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t WriteValue)
+bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t WriteValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -511,12 +511,12 @@ bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t Write
 #ifndef RS232_COM
 			TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
 			/*Send the message with TML instruction - HW dependent*/
-			if (!SendMessage(&CAN_TX_message))
+			if (SendMessage(&CAN_TX_message, fd) < 0)
 				return false;
 #else
 			TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
 			/*Send the message with TML instruction - HW dependent*/
-			if (!SendMessage(&RS232_TX_message))
+			if (SendMessage(&RS232_TX_message) < 0)
 				return false;
 #endif			
 
@@ -540,11 +540,11 @@ bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t Write
 		/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;
 #endif
 		return true;
@@ -554,7 +554,7 @@ bool TSL_Write16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t Write
 
 }
 
-bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t WriteValue)
+bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t WriteValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_TX_message;
@@ -576,12 +576,12 @@ bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t Write
 #ifndef RS232_COM
 			TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
 			/*Send the message with TML instruction - HW dependent*/
-			if (!SendMessage(&CAN_TX_message))
+			if (SendMessage(&CAN_TX_message, fd) < 0)
 				return false;
 #else
 			TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
 			/*Send the message with TML instruction - HW dependent*/
-			if (!SendMessage(&RS232_TX_message))
+			if (SendMessage(&RS232_TX_message) < 0)
 				return false;
 #endif
 
@@ -607,11 +607,11 @@ bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t Write
 		/*Send the message with TML instruction - HW dependent*/
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;
 #endif
 
@@ -622,7 +622,7 @@ bool TSL_Write32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t Write
 
 }
 
-bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadValue)
+bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_RX_message;
@@ -656,12 +656,12 @@ bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadV
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
 		/*Send the message with TML instruction - HW dependent*/
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
 		/*Send the message with TML instruction - HW dependent*/
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;
 #endif
 
@@ -671,7 +671,7 @@ bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadV
 	if ((MemoryAddress >= EEPROM_LOWER_ADDR) && (MemoryAddress <= EEPROM_UPPER_ADDR))
 	{
 #ifndef RS232_COM
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;
 		*ReadValue = ((uint16_t)CAN_RX_message.CAN_data[5] << 8) | CAN_RX_message.CAN_data[4];
 #else
@@ -683,7 +683,7 @@ bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadV
 	else
 	{	
 #ifndef RS232_COM
-		if (!ReceiveMessage(&CAN_RX_message))
+		if (!ReceiveMessage(&CAN_RX_message, fd))
 			return false;		
 		*ReadValue = ((uint16_t)CAN_RX_message.CAN_data[3] << 8) | CAN_RX_message.CAN_data[2];
 #else
@@ -699,7 +699,7 @@ bool TSL_Read16bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint16_t *ReadV
 
 }
 
-bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t *ReadValue)
+bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t *ReadValue, int fd)
 {
 #ifndef RS232_COM
 	CAN_MSG CAN_RX_message;
@@ -733,11 +733,11 @@ bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t *ReadV
 		/*Send the message with the TML instruction - HW dependent*/
 #ifndef RS232_COM
 		TSL_TML_to_TMLCAN(AxisID, &TML_instruction, &CAN_TX_message);
-		if (!SendMessage(&CAN_TX_message))
+		if (SendMessage(&CAN_TX_message, fd) < 0)
 			return false;
 #else
 		TSL_TML_to_RS232(AxisID, &TML_instruction, &RS232_TX_message);
-		if (!SendMessage(&RS232_TX_message))
+		if (SendMessage(&RS232_TX_message) < 0)
 			return false;	
 #endif
 
@@ -747,7 +747,7 @@ bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t *ReadV
 		if ((MemoryAddress >= EEPROM_LOWER_ADDR) && (MemoryAddress <= EEPROM_UPPER_ADDR))
 		{
 #ifndef RS232_COM
-			if (!ReceiveMessage(&CAN_RX_message))
+			if (!ReceiveMessage(&CAN_RX_message, fd))
 				return false;
 			*ReadValue = ((uint32_t)(((uint16_t)CAN_RX_message.CAN_data[7]) << 8 | CAN_RX_message.CAN_data[6]) << 16) | ((uint16_t)CAN_RX_message.CAN_data[5]) << 8 | CAN_RX_message.CAN_data[4];
 #else
@@ -759,7 +759,7 @@ bool TSL_Read32bitValue(uint16_t AxisID, uint16_t MemoryAddress, uint32_t *ReadV
 		else
 		{
 #ifndef RS232_COM
-			if (!ReceiveMessage(&CAN_RX_message))
+			if (!ReceiveMessage(&CAN_RX_message, fd))
 				return false;
 			*ReadValue = ((uint32_t)((CAN_RX_message.CAN_data[5]) << 8 | CAN_RX_message.CAN_data[4]) << 16) | (CAN_RX_message.CAN_data[3]) << 8 | CAN_RX_message.CAN_data[2];
 #else
