@@ -61,7 +61,7 @@ int InitCanSock(uint32_t canId, char* ifName, int timeoutMs)
     addr.can_ifindex = ifr.ifr_ifindex;
 
     // Bind to specified interface
-    if(bind(fd, &(addr), sizeof(addr))) {
+    if(bind(fd, (struct sockaddr *)(&addr), sizeof(addr))) {
         perror("bind");
         printf("Could not bind to interface %s\n", ifr.ifr_name);
         close(fd);

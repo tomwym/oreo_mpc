@@ -5,14 +5,6 @@
 #include "../include/TML_lib_light.h"
 #endif
 
-#include <stdbool.h>
-
-#define EYE_CAN_ID
-#define NECK_CAN_ID
-
-#define IFACE_NAME          "can0"
-#define SOCK_TIMEOUT_SEC    1       // sec
-
 #ifndef TML_LIB_EN
 typedef struct {
 	uint32_t identifier;
