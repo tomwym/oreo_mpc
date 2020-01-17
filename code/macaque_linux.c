@@ -1,7 +1,7 @@
 /*
     TODO:
+    - Change rx_buf to store CAN_MSG instead
     - Replace SwitchToThread with Linux-equivalent
-    - Figure out how byte ordering works
     - Figure out what to do for debug window
 */
 
@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <time.h>
 #include "macaque_linux.h"
-#include "cansock.h"
+#include "./cansock_interface/cansock.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -32,10 +32,10 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <sys/resource.h>
 
-#define M_PI            ((double)3.14159265358979323846)
 #define COUNTS_PER_POLE	((double)2048)
 #define METERS_PER_POLE ((double)0.018)
 #define IU_TO_M (METERS_PER_POLE/COUNTS_PER_POLE)
@@ -77,11 +77,12 @@
 #define NECK_CAN_IFNAME             "can0"
 #define EYE_CAN_ID                  (0x101)
 #define EYE_CAN_IFNAME              "can1"
-#define CONTROL_CAN_ID              (0x100)
+#define CONTROL_CAN_ID              (0x120)
 #define IFNAME_LEN                  4
 
-#define CURRENT_PID                    0
-#define PROCESS_PRIORITY                -20  // -20 (highest) to 19 (lowest)
+#define CURRENT_PID                 0
+#define PROCESS_PRIORITY            -20  // -20 (highest) to 19 (lowest)
+#define NULL_THREAD                 (pthread_t)(0)
 
 #define SEC_TO_MSEC         (1000)
 #define MSEC_TO_USEC        (1000)
@@ -146,13 +147,13 @@ static double get_timestamp();
 
 typedef struct devHandle
 {
-    int fd;
-    uint32_t can_id;
+    int             fd;
+    uint32_t        can_id;
     char            ifName[IFNAME_LEN];
     
     int         	runFlag;
-    pthread_t      	txThreadHandle;
-    pthread_t      	rxThreadHandle;
+    pthread_t      txThreadHandle;
+    pthread_t     rxThreadHandle;
     char        	rx_buf[BUFLEN];
 
     uint32_t         	ack_pend;
@@ -167,13 +168,13 @@ typedef struct devHandle
 
 } devHandle_t;
 
-devHandle_t eye  = {.can_id = EYE_CAN_ID, .ifName = EYE_CAN_IFNAME,.force_sync=0,
-                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
-		    .host_id = EYE_HOST_ID, .callback = &eyeRxCallback};
+devHandle_t eye  = {.fd = -1,.can_id = EYE_CAN_ID, .ifName = EYE_CAN_IFNAME,.txThreadHandle = NULL_THREAD,
+                    .rxThreadHandle = NULL_THREAD, .force_sync=0, .ack_pend = 0, .cmd_consume_idx = 0, 
+                    .cmd_produce_idx = 0, .host_id = EYE_HOST_ID, .callback = &eyeRxCallback};
 
-devHandle_t neck = {.can_id = NECK_CAN_ID, .ifName = NECK_CAN_IFNAME, .force_sync=0,
-                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
-		    .host_id = NECK_HOST_ID, .callback = &neckRxCallback};
+devHandle_t neck = {.fd=-1, .can_id = NECK_CAN_ID, .ifName = NECK_CAN_IFNAME, .txThreadHandle = NULL_THREAD,
+                    .rxThreadHandle = NULL_THREAD, .force_sync=0, .ack_pend = 0, .cmd_consume_idx = 0, 
+                    .cmd_produce_idx = 0, .host_id = NECK_HOST_ID, .callback = &neckRxCallback};
 
 static void add_log_data(rawDataLog_t* log, double time, double data, uint8_t id)
 {
@@ -342,15 +343,13 @@ static void parse_response_msg(devHandle_t* dev)
     uint16_t axis;
     uint16_t reg_addr;
 
-    if(msg == NULL)
-    {  
+    if(msg == NULL) {  
         return;
     }
 
     int size = msg[MSG_SIZE_OFFSET]+2;
     
-    if( msg[size-1] != gen_cksum(msg,size) || size < MSG_TYPEA_BASE)
-    {
+    if( msg[size-1] != gen_cksum(msg,size) || size < MSG_TYPEA_BASE) {
         return;
     }
 
@@ -358,29 +357,25 @@ static void parse_response_msg(devHandle_t* dev)
     uint16_t optcode    = GETWORD_FROM_BYTES(&msg[MSG_OPT_OFFSET]);
 
     if (((optcode&MSG_TAKE_OPTCODE_MASK) == (OPT_1WORD_RESP_GRP&MSG_TAKE_OPTCODE_MASK)) 
-        && size == MSG_TAKE1WORD_SIZE)
-    {
+        && size == MSG_TAKE1WORD_SIZE) {
         axis         = optcode&0xFF;      
         reg_addr     = GETWORD_FROM_BYTES(&msg[MSG_TAKE_REG_ADDR_OFFSET]);
         int16_t temp = GETWORD_FROM_BYTES(&msg[MSG_TAKE_DATA_OFFSET]);
         result       = (int32_t)temp;
     }
     else if (((optcode&MSG_TAKE_OPTCODE_MASK) == (OPT_2WORD_RESP_GRP&MSG_TAKE_OPTCODE_MASK))
-             && size == MSG_TAKE2WORD_SIZE)
-    {
+             && size == MSG_TAKE2WORD_SIZE) {
         axis     = optcode&0xFF;
         reg_addr = GETWORD_FROM_BYTES(&msg[MSG_TAKE_REG_ADDR_OFFSET]);	
         result   = GETLONG_FROM_BYTES(&msg[MSG_TAKE_DATA_OFFSET]);
     }	
-    else if(optcode == OPT_1WORD_RESP && size == MSG_GIVE1WORD_SIZE)
-    {
+    else if(optcode == OPT_1WORD_RESP && size == MSG_GIVE1WORD_SIZE) {
         axis         = get_addr(GETWORD_FROM_BYTES(&msg[MSG_SEND_ADDR_OFFSET]));
         reg_addr     = GETWORD_FROM_BYTES(&msg[MSG_GIVE_REG_ADDR_OFFSET]);
         int16_t temp = GETWORD_FROM_BYTES(&msg[MSG_GIVE_DATA_OFFSET]);
         result       = (int32_t)temp;
     }
-    else if(optcode == OPT_2WORD_RESP && size == MSG_GIVE2WORD_SIZE)
-    { 
+    else if(optcode == OPT_2WORD_RESP && size == MSG_GIVE2WORD_SIZE) { 
         axis       = get_addr(GETWORD_FROM_BYTES(&msg[MSG_SEND_ADDR_OFFSET]));
         reg_addr   = GETWORD_FROM_BYTES(&msg[MSG_GIVE_REG_ADDR_OFFSET]);
         result     = GETLONG_FROM_BYTES(&msg[MSG_GIVE_DATA_OFFSET]);
@@ -428,7 +423,7 @@ void* ThreadRXFunc(void* input)
                     dev->force_sync = 0;
                     dev->ack_pend = 0;
                 } else if(dev->rx_buf[0] == MSG_ACK && dev->ack_pend > 0) {
-                    // Check if ack message has been received (empty message)
+                    // Check if ack message has been received (ignore content)
                     dev->ack_pend--;
                 } else {
                     // Parse the msg for relevant data
@@ -451,7 +446,7 @@ void* ThreadTXFunc(void* input)
 
     if(sched_setscheduler(CURRENT_TID, SCHED_RR, &param)) {
         err = errno;
-        printf("Failed to set RX Thread priority with error %d\n", err);
+        printf("Failed to set tx thread priority with error %d\n", err);
     }
 
     // Loop while dev is running or cmds in buffer
@@ -464,11 +459,11 @@ void* ThreadTXFunc(void* input)
             usleep(TX_THREAD_SLEEP);
         } 
         else if(dev->ack_pend < MAX_ACK_PEND && (dev->cmd_produce_idx - dev->cmd_consume_idx) != 0) {  
-            // check if cmds are still remaining in buf or not too many pending acks
+            // check if cmds are still remaining in buf or not too many acks still pending
             index = dev->cmd_consume_idx % MAX_CMD_PEND;
 
             if (SendMessage(&msg, dev->fd) < 0) {
-                printf("sendto() failed with error code : %d\n" , WSAGetLastError());
+                printf("Failed to send message from send buf\n");
                 break;
             }
 
@@ -482,7 +477,7 @@ void* ThreadTXFunc(void* input)
                 printf("lost too many MSG ACKS, resyncing...\n");
                 dev->force_sync=1;
             }
-            //yield, ethier we have too many messages pending or nothing to consume
+            //yield, either we have too many messages pending or nothing to consume
             //SwitchToThread();
             usleep(TX_THREAD_SLEEP); // We will try sleeping it first
             sched_yield();      // a little different than SwitchToThread
@@ -491,7 +486,7 @@ void* ThreadTXFunc(void* input)
 }
 
 // Force device to enter sync mode
-static void sync(devHandle_t* dev)
+static void syncDev(devHandle_t* dev)
 {
     dev->force_sync=1;
 }
@@ -542,7 +537,7 @@ static uint16_t connectDev(devHandle_t* dev)
         return CONN_CONFIG_ERR;
     }
 
-    sync(dev);
+    syncDev(dev);
 
     return CONN_OK;
 }
@@ -584,27 +579,25 @@ static void shutdownDev(devHandle_t* dev)
     // Stop the processing threads
     dev->runFlag = 0;
 
-    if(dev->rxThreadHandle != NULL) {
+    if(dev->rxThreadHandle != NULL_THREAD) {
         pthread_cancel(dev->rxThreadHandle);
         if(pthread_join(dev->rxThreadHandle, NULL) != 0) {
             err = errno;
             printf("pthread_join for rx failed with errno=%d\n", err);
         }
-        dev->rxThreadHandle = NULL;
+        dev->rxThreadHandle = NULL_THREAD;
     }
 
-    if(dev->txThreadHandle != NULL)
-    {
+    if(dev->txThreadHandle != NULL_THREAD) {
         pthread_cancel(dev->txThreadHandle);
         if(pthread_join(dev->txThreadHandle, NULL) != 0) {
             err = errno;
             printf("pthread_join for tx failed with errno=%d\n", err);
         }
-        dev->txThreadHandle = NULL;
+        dev->txThreadHandle = NULL_THREAD;
     }
 
-    if(dev->fd > -1)
-    {
+    if(dev->fd > -1) {
         if(runState) {
             printf("Processing threads complete, disconnecting\n");
             disconnectDev(dev);
@@ -641,8 +634,14 @@ static void startDev(devHandle_t* dev)
     if(conn_count<5) {
         // If we can talk with the drive, start the processing threads
         dev->runFlag=1;
-        dev->rxThreadHandle = CreateThread(NULL, 0, ThreadRXFunc, dev, 0, NULL);
-        dev->txThreadHandle = CreateThread(NULL, 0, ThreadTXFunc, dev, 0, NULL);
+        if(pthread_create(&dev->rxThreadHandle, NULL, ThreadRXFunc, dev) != 0) {
+            printf("Failed to start dev rx thread\n");
+            return;
+        }
+        if(pthread_create(&dev->txThreadHandle, NULL, ThreadTXFunc, dev)) {
+            printf("Failed to start dev tx thread\n");
+            return;
+        }
     }
     else {
         printf("Failed to connect to drive\n");
@@ -654,8 +653,7 @@ static msg_t* getMsgSlot(devHandle_t* dev)
 {
     double base_time = get_timestamp();
     double cur_time;
-    while (dev->cmd_produce_idx - dev->cmd_consume_idx == MAX_CMD_PEND)
-    {
+    while (dev->cmd_produce_idx - dev->cmd_consume_idx == MAX_CMD_PEND) {
         cur_time = get_timestamp();
  
         if(cur_time - base_time > SEND_TIMEOUT_S || dev->runFlag == 0)
@@ -678,8 +676,7 @@ static msg_t* getMsgSlot(devHandle_t* dev)
 // Build message which does not require a return message from motor drive
 static void buildMsgTypeA(msg_t* msg_s, uint8_t axis_id, uint16_t optcode, uint32_t data, uint8_t words, uint8_t group)
 {
-    if(words > 2 || msg_s == NULL)
-    {
+    if(words > 2 || msg_s == NULL) {
         words = 2;
     }
 
@@ -691,12 +688,10 @@ static void buildMsgTypeA(msg_t* msg_s, uint8_t axis_id, uint16_t optcode, uint3
     GETBYTES_FROM_WORD(dest_addr_formatted, &msg[MSG_ADDR_OFFSET]);
     GETBYTES_FROM_WORD(optcode, &msg[MSG_OPT_OFFSET]);
    
-    if(words == 1)
-    {
+    if(words == 1) {
         GETBYTES_FROM_WORD(0xFFFF&data, &msg[MSG_TYPEA_BASE-1]);
     }
-    else if(words == 2)
-    {
+    else if(words == 2) {
         GETBYTES_FROM_LONG(data, &msg[MSG_TYPEA_BASE-1]);
     }
 
@@ -779,7 +774,7 @@ void sendMsgTypeBNeck(uint8_t axis_id, uint16_t reg_addr, uint8_t words)
 }
 
 // Start the library
-void start(void)
+void __attribute__ ((constructor)) start(void)
 {
     int err; 
     struct timespec currTime = {0,0};
@@ -804,7 +799,7 @@ void start(void)
     printf("Initialised.\n");
 }
 
-void cleanup(void)
+void __attribute__ ((destructor)) cleanup(void)
 {
     shutdownDev(&eye);
     shutdownDev(&neck);
@@ -927,8 +922,7 @@ void setEyeAccel(uint8_t axis, double accel_mpss)
 
 void startEyeCal(uint8_t axis, double pos_m)
 {
-    if(axis <=0 || axis > NUM_EYE_AXIS)
-    {
+    if(axis <=0 || axis > NUM_EYE_AXIS) {
         return;
     }
 
@@ -937,12 +931,10 @@ void startEyeCal(uint8_t axis, double pos_m)
     setEyePos(axis, pos_m);
     eyeCalData.complete[axis-1] = CAL_RUNNING;
 
-    if(pos_m > 0)
-    {
+    if(pos_m > 0) {
         sendMsgTypeAEye(axis, OPT_GOTO, FOR_CAL_IP, 1, 0);
     }
-    else
-    {
+    else {
         sendMsgTypeAEye(axis, OPT_GOTO, REV_CAL_IP, 1, 0);
     }
 }
