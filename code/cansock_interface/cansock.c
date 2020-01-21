@@ -16,16 +16,16 @@
 #include <linux/can/raw.h>
 #include <sys/socket.h>
 
-#define MAX_CAN_ID          (0x800)
-#define SEC_TO_MSEC         (1000)
-#define MSEC_TO_USEC        (1000)
-#define DEFAULT_TIMEOUT_SEC     1
-#define DEFAULT_TIMEOUT_USEC    0
-
-static struct timeval setTimeout;
+#define MAX_CAN_ID                    (0x800)
+#define SEC_TO_MSEC                   (1000)
+#define MSEC_TO_USEC                  (1000)
+#define DEFAULT_TIMEOUT_SEC           (1)
+#define DEFAULT_TIMEOUT_USEC          (0)
+#define FILTER_ID(id, grp)            ((uint32_t)id << 13)|(grp << 21)
+#define FILTER_MASK                   (0x003FE000)
 
 // Create CAN socket to tx/rx with the motor controller
-int InitCanSock(uint32_t canId, char* ifName, int timeoutMs)
+int InitCanSock(uint8_t hostId, char* ifName, int timeoutMs)
 {      
     // Init the struct
     int fd = -1;
@@ -40,14 +40,8 @@ int InitCanSock(uint32_t canId, char* ifName, int timeoutMs)
 		return -1;
 	}
 
-    // Set socket to recv from specified can ID only
-    if(canId >= MAX_CAN_ID) {
-        printf("Invalid CAN Id for socket init\n");
-        return -1;
-    }
-    filter.can_id = canId;
-    filter.can_mask = CAN_SFF_MASK;
-    setsockopt(fd, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
+    // Receive messages destined for host only
+    AddFilter(fd, hostId, 0);
 
     // Find interface index from the name
     addr.can_family = AF_CAN;
@@ -75,7 +69,22 @@ int InitCanSock(uint32_t canId, char* ifName, int timeoutMs)
     // Perhaps want to maximize the recv/send buffer
     // using setsockopt with SO_RCVBUF SO_SNDBUF
 
+    // Turn on and turn off loopback
+
     return fd;
+}
+
+// Apply filter to can socket
+void AddFilter(int fd, uint8_t id, uint8_t isGroup)
+{
+    struct can_filter filter;
+    
+    if(isGroup > 0)
+        isGroup = 1;
+    
+    filter.can_id = FILTER_ID(id, isGroup);
+    filter.can_mask = FILTER_MASK;
+    setsockopt(fd, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
 }
 
 // Clean up socket

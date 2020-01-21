@@ -16,7 +16,10 @@ typedef struct {
 // Init Function
 // Returns file descriptor on success
 // Else returns -1
-int InitCanSock(uint32_t canId, char* ifName, int timeoutMs);
+int InitCanSock(uint8_t hostId, char* ifName, int timeoutMs);
+
+// Add filter to can socket
+void AddFilter(int fd, uint8_t id, uint8_t isGroup);
 
 // Clean up socket
 void CleanCanSock(int fd);
