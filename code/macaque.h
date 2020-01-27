@@ -1,38 +1,38 @@
 #include <stdint.h>
 
-#define SHUTDOWN_TIMEOUT_MS 	2000
+#define SHUTDOWN_TIMEOUT_MS	2000
 #define RX_TIMEOUT_MS		1000
 #define SEND_TIMEOUT_S		1.0
-#define BUFLEN 			32  	
-#define LOG_BUFLEN		1024
+#define BUFLEN 			    32  	
+#define LOG_BUFLEN		    1024
 #define MAX_ACK_PEND 		4  //limit how much we pound the drives with polls for data
 #define MAX_CMD_PEND 		8  //must be a power of 2
 
-#define CONN_PORT		30689u
-#define CONN_MSG		((uint8_t[]){0x01})
-#define CONN_RESP		((uint8_t)0x02)
+#define CONN_PORT		    30689u
+#define CONN_MSG		    ((uint8_t[]){0x01})
+#define CONN_RESP		    ((uint8_t)0x02)
 #define CONN_CONFIG	        ((uint8_t[]){0x03,0x00,0xC2,0x01,0x00})//1Mbit config
 #define CONN_CONFIG_RESP	((uint8_t)0x04)
-#define CONN_ERR		1
+#define CONN_ERR		    1
 #define CONN_CONFIG_ERR		2
 #define CONN_SYNC_ERR		3
-#define CONN_OK			0
+#define CONN_OK			    0
 #define CONN_SYNC_RESP		0x0Du
 #define CONN_SYNC_BYTES		15
 #define CONN_SYNC_BYTE		0xFFu
-#define DISCONN_MSG		((uint8_t[]){0x05})
+#define DISCONN_MSG		    ((uint8_t[]){0x05})
 #define DISCONN_RESP		((uint8_t)0x06)
 
-#define COMM_PORT		1700
-#define MSG_ACK			((uint8_t)0x4F)
+#define COMM_PORT		    1700
+#define MSG_ACK			    ((uint8_t)0x4F)
 
 #define NECK_HOST_ID		121
 #define NECK_LOCAL_PORT		51244u
-#define NECK_IP			"192.168.2.15"
+#define NECK_IP			    "192.168.2.15"
 
-#define EYE_HOST_ID		120
+#define EYE_HOST_ID		    120
 #define EYE_LOCAL_PORT		51243u
-#define EYE_IP			"192.168.2.14"
+#define EYE_IP			    "192.168.2.14"
 
 #define MSG_TYPEA_BASE		6
 #define MSG_TYPEB_BASE		10
