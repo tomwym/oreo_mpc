@@ -24,14 +24,14 @@
 #define FILTER_ID(id, grp)            ((uint32_t)id << 13)|(grp << 21)
 #define FILTER_MASK                   (0x003FE000)
 
+
 // Create CAN socket to tx/rx with the motor controller
-int InitCanSock(uint8_t hostId, char* ifName, int timeoutMs)
+int InitCanSock(char* ifName, int timeoutMs)
 {      
     // Init the struct
     int fd = -1;
     struct ifreq ifr;
     struct sockaddr_can addr;
-    struct can_filter filter;
 
     // Open the CAN socket
 	if ((fd = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
@@ -39,9 +39,6 @@ int InitCanSock(uint8_t hostId, char* ifName, int timeoutMs)
         printf("Could not open socket\n");
 		return -1;
 	}
-
-    // Receive messages destined for host only
-    AddFilter(fd, hostId, 0);
 
     // Find interface index from the name
     addr.can_family = AF_CAN;
@@ -75,15 +72,12 @@ int InitCanSock(uint8_t hostId, char* ifName, int timeoutMs)
 }
 
 // Apply filter to can socket
-void AddFilter(int fd, uint8_t id, uint8_t isGroup)
+void AddFilter(int fd, uint32_t id, uint32_t mask)
 {
     struct can_filter filter;
     
-    if(isGroup > 0)
-        isGroup = 1;
-    
-    filter.can_id = FILTER_ID(id, isGroup);
-    filter.can_mask = FILTER_MASK;
+    filter.can_id = id;
+    filter.can_mask = mask;
     setsockopt(fd, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
 }
 
@@ -122,6 +116,8 @@ int SendMessage(CAN_MSG * CAN_TX_message, int fd)
     // Format CAN message
     struct can_frame frame;
     frame.can_id = CAN_TX_message->identifier;
+    if(CAN_TX_message->type == EXTENDED_FRAME)
+        frame.can_id |= CAN_EFF_FLAG;
     frame.can_dlc = CAN_TX_message->length;
     memset(frame.data, 0, CAN_MAX_DLEN);
     memcpy(frame.data, CAN_TX_message->CAN_data, frame.can_dlc);
@@ -174,23 +170,10 @@ int ReceiveMessage(CAN_MSG * CAN_RX_message, int fd)
 
     // Copy relevant info to struct
     CAN_RX_message->identifier = frame.can_id;
+    CAN_RX_message->identifier &= ~(CAN_EFF_FLAG & CAN_RTR_FLAG & CAN_ERR_FLAG);
     CAN_RX_message->length = frame.can_dlc;
-    memcpy(&(CAN_RX_message->CAN_data), &(frame.data), CAN_MAX_DLEN);
+    memcpy(&(CAN_RX_message->CAN_data), &(frame.data), CAN_RX_message->length);
 
-    return 0;
-}
-
-// Receive CAN Message
-int ReceivePayload(void* payload, int fd)
-{
-    CAN_MSG msg;
-    int ret = 0;
-    memset(&msg, 0, sizeof(msg));
-    ret = ReceiveMessage(&msg, fd);
-    if(ret < 0)
-        return ret;
-    
-    memcpy(payload, msg.CAN_data, msg.length);
     return 0;
 }
 
@@ -200,3 +183,25 @@ int ReceivePayload(void* payload, int fd)
     setTimeout.tv_sec = timeoutMs/SEC_TO_MSEC;
     setTimeout.tv_usec = (timeoutMs%SEC_TO_MSEC)*MSEC_TO_USEC;
 }*/
+
+// Empty the receive buffer
+void FlushCanSock(int fd)
+{
+    fd_set set;
+    struct can_frame frame;
+    uint8_t recvBytes;
+
+    FD_ZERO(&set);
+    FD_SET(fd, &set);
+    struct timeval timeout = {.tv_sec = 0, .tv_usec = 0};
+    while(select(FD_SETSIZE, NULL, &set, NULL, &(timeout)) > 0) {
+        recvBytes = read(fd, &frame, sizeof(struct can_frame));
+        if (recvBytes < 0) {
+            perror("can raw socket read");
+            return;
+        }
+
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+    }
+}
