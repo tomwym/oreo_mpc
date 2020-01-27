@@ -2,6 +2,10 @@
 #define MACAQUE_LINUX_H
 #include <stdint.h>
 
+// Configure debug modes
+#define DEBUG_CAN           // Print out all rx/tx CAN messages
+
+// Configurable settings for the library
 #define SHUTDOWN_TIMEOUT_MS 	    2000
 #define RX_TIMEOUT_MS		        1000
 #define SEND_TIMEOUT_S		        1.0
@@ -10,111 +14,74 @@
 #define MAX_ACK_PEND 		        4  //limit how much we pound the drives with polls for data
 #define MAX_CMD_PEND 		        8  //must be a power of 2
 
-#define CONN_PORT		            30689u
-#define CONN_MSG		            ((uint8_t[]){0x01})
-#define CONN_RESP		            ((uint8_t)0x02)
-#define CONN_CONFIG	                ((uint8_t[]){0x03,0x00,0xC2,0x01,0x00})//1Mbit config
-#define CONN_CONFIG_RESP	        ((uint8_t)0x04)
-#define CONN_ERR		            1
-#define CONN_CONFIG_ERR		        2
-#define CONN_SYNC_ERR		        3
-#define CONN_OK			            0
-#define CONN_SYNC_RESP		        0x0Du
-#define CONN_SYNC_BYTES		        15
-#define CONN_SYNC_BYTE		        0xFFu
-#define DISCONN_MSG		            ((uint8_t[]){0x05})
-#define DISCONN_RESP		        ((uint8_t)0x06)
+// Configurable settings for the motor controllers
+#define HOST_ID                     8
+#define NECK_GROUP_ID		        1
+#define EYE_GROUP_ID		        2
 
-#define COMM_PORT		            1700
-#define MSG_ACK			            ((uint8_t)0x4F)
-
-#define NECK_HOST_ID		        121
-#define EYE_HOST_ID		            120
-
-#define MSG_TYPEA_BASE		        6
-#define MSG_TYPEB_BASE		        10
-#define MSG_SIZE_OFFSET		        0
-#define MSG_ADDR_OFFSET		        1
-#define MSG_OPT_OFFSET		        3
-#define MSG_SEND_ADDR_OFFSET	    5
-#define MSG_TAKE_REG_ADDR_OFFSET    5
-#define MSG_GIVE_REG_ADDR_OFFSET    7
-#define MSG_TAKE_DATA_OFFSET	    7
-#define MSG_GIVE_DATA_OFFSET	    9
-#define MSG_TAKE1WORD_SIZE	        10
-#define MSG_TAKE2WORD_SIZE	        12
-#define MSG_GIVE1WORD_SIZE	        12
-#define MSG_GIVE2WORD_SIZE	        14
-#define MSG_TAKE_OPTCODE_MASK       0xFF00
-
-#define OPT_1WORD_RESP		        0xB404u         // Response msg from OPT_1WORD_REQ
-#define OPT_2WORD_RESP		        0xB405u         // Response msg from OPT_2WORD_REQ
-#define OPT_1WORD_RESP_GRP	        0xD400u         // Response msg from OPT_1WORD_REQ_GRP
-#define OPT_2WORD_RESP_GRP	        0xD500u         // Response msg from OPT_2WORD_REQ_GRP
-#define OPT_1WORD_REQ		        0xB004u         // Request 16 bit val from RAM of one axis
-#define OPT_2WORD_REQ		        0xB005u         // Request 32 bit val from RAM of one axis
-#define OPT_1WORD_REQ_GRP	        0xB204u         // Request 16 bit val from RAM of axis group
-#define OPT_2WORD_REQ_GRP	        0xB205u         // Request 32 bit val from RAM of axis group
-#define OPT_CACC		            0x24A2u         // accel setpoint (decel rate during a "stop" command)
-#define OPT_CSPD		            0x24A0u         // speed setpoint
-#define OPT_CPOS		            0x249Eu         // Desired final position
-#define OPT_GOTO		            0x7400u         // Go to certain position in program code
-#define REG_ADDR_APOS		        0x0228u         // actual position
-#define REG_ADDR_POSERR		        0x022Au         // position error
-#define REG_ADDR_APOS2		        0x081Cu         // actual position 2?
-#define REG_ADDR_TPOS		        0x02B2u         // Target position
-#define REG_ADDR_MASK		        0x07FFu         // Mask for getting the reg address
-
-//technosoft drive program specific addresses (Locations of specific motion profiles)
-#define MOTION_LOOP_IP		        0x4022u     // Motion(eye) loop
-#define WAIT_LOOP_IP		        0x401Bu     // Wait(eye) loop
-#define MOTION_LOOP_NECK_IP	        0x403Bu     // Motion(neck) loop
-#define WAIT_LOOP_NECK_IP	        0x4034u     // Wait(neck) loop
-#define REV_CAL_IP		            0x4061u     // Reverse calibration
-#define FOR_CAL_IP		            0x4027u     // Forward calibration
-#define CAL_RUN_VAR		            0x03B3u     // Calibration has been run
+// Technosoft drive program specific addresses (Locations of specific motion profiles)
+#define MOTION_LOOP_IP		        0x4022u     
+#define WAIT_LOOP_IP		        0x401Bu     
+#define MOTION_LOOP_NECK_IP	        0x403Bu     
+#define WAIT_LOOP_NECK_IP	        0x4034u     
+#define REV_CAL_IP		            0x4061u     
+#define FOR_CAL_IP		            0x4027u     
+#define CAL_RUN_VAR		            0x03B3u     
 #define CAL_APOS2_OFF_VAR	        0x03B0u     
 
-//eye drive defines
-#define LEFT			            0
-#define RIGHT			            1
-#define NUM_EYES		            2
-#define NUM_EYE_AXIS		        (2*(NUM_EYES))
+// Eye drive defines
+typedef enum {
+    LEFT,
+    RIGHT,
+    NUM_EYES,
+    NUM_EYE_AXIS = (NUM_EYES*2),
+} eye_drive_t;
 
-//axis id mapping
-#define EYE_YAW_LEFT_AXIS	        1
-#define EYE_PITCH_LEFT_AXIS	        2
-#define EYE_PITCH_RIGHT_AXIS	    3
-#define EYE_YAW_RIGHT_AXIS	        4
+// Axis id mapping
+typedef enum {
+    EYE_YAW_LEFT_AXIS,
+    EYE_PITCH_LEFT_AXIS,
+    EYE_PITCH_RIGHT_AXIS,
+    EYE_YAW_RIGHT_AXIS,
+} eye_axis_id_t;
 
-//log data id
-#define EYE_YAW_LEFT                0
-#define EYE_PITCH_LEFT		        1
-#define EYE_YAW_RIGHT		        2
-#define EYE_PITCH_RIGHT		        3 
-#define EYE_LEFT_LEFT_POS	        4
-#define EYE_LEFT_RIGHT_POS	        5
-#define EYE_RIGHT_LEFT_POS	        6
-#define EYE_RIGHT_RIGHT_POS	        7
-#define EYE_LEFT_LEFT_POSERR	    8
-#define EYE_LEFT_RIGHT_POSERR 	    9
-#define EYE_RIGHT_LEFT_POSERR	    10
-#define EYE_RIGHT_RIGHT_POSERR	    11
+// Log data id
+typedef enum {
+    EYE_YAW_LEFT,
+    EYE_PITCH_LEFT,
+    EYE_YAW_RIGHT,
+    EYE_PITCH_RIGHT,
+    EYE_LEFT_LEFT_POS,
+    EYE_LEFT_RIGHT_POS,
+    EYE_RIGHT_LEFT_POS,
+    EYE_RIGHT_RIGHT_POS,
+    EYE_LEFT_LEFT_POSERR,
+    EYE_LEFT_RIGHT_POSERR,
+    EYE_RIGHT_LEFT_POSERR,
+    EYE_RIGHT_RIGHT_POSERR,
+} eye_log_data_id_t;
 
-//neck drive defines
-//axis id mapping
-#define NUM_NECK_AXIS		        3
-#define NECK_YAW_AXIS		        1
-#define NECK_PITCH_AXIS		        2
-#define NECK_ROLL_AXIS		        3
+// Neck drive defines
+// Axis id mapping
+typedef enum {
+    NECK_YAW_AXIS = 1,
+    NECK_PITCH_AXIS,
+    NECK_ROLL_AXIS,
+    NUM_NECK_AXIS = NECK_ROLL_AXIS,
+} neck_drive_t;
 
-//log data id
-#define NECK_YAW		            0
-#define NECK_PITCH		            1
-#define NECK_ROLL		            2
+// Log data id
+typedef enum {
+    NECK_YAW,
+    NECK_PITCH,
+    NECK_ROLL,
+} neck_log_data_id_t;
 
-#define CAL_COMPLETE		        0
-#define CAL_RUNNING		            1
+// Calibration states
+typedef enum {
+    CAL_COMPLETE,
+    CAL_RUNNING,
+} cal_states_t;
 
 typedef struct eyeCalData
 {
@@ -142,47 +109,63 @@ typedef struct neckData
     double time;
 } neckData_t;
 
-void sendMsgTypeAEye(uint8_t axis_id, uint16_t optcode, uint32_t data, uint8_t words, uint8_t group);
+// Message types supported by library
+typedef enum msgType
+{
+    CMD_GOTO,
+    CMD_GETDATA_16,
+    CMD_GETDATA_32,
+    CMD_GETDATA2_16,
+    CMD_GETDATA2_32,
+    CMD_SETDATA_16,
+    CMD_SETDATA_32,
+    //CMD_SETDATA_16_GROUP,
+    //CMD_SETDATA_32_GROUP,
+    CMD_STA,
+    CMD_AXISON,
+    CMD_AXISOFF,
+    CMD_UPDATEMODE_0,
+    CMD_UPDATEMODE_1,
+    CMD_MOTIONMODE_PP,
+    CMD_MOTIONMODE_PP1,
+    CMD_MOTIONMODE_PP3,
+    CMD_SET_POSABS,
+    CMD_SET_POSREL,
+    CMD_SET_MASTERID,
+} msgType_t;
 
-void sendMsgTypeBEye(uint8_t axis_id, uint16_t reg_addr, uint8_t words);
-
-void sendMsgTypeANeck(uint8_t axis_id, uint16_t optcode, uint32_t data, uint8_t words, uint8_t group);
-
-void sendMsgTypeBNeck(uint8_t axis_id, uint16_t reg_addr, uint8_t words);
 
 
-
+// Functions to interface with neck controller
 neckData_t* getNeckData(void);
-
-void enNeckPollData(void);
-
-void disNeckPollData(void);
-
-void setNeckPos(uint8_t axis, double pos_rad);
-
-void setNeckSpeed(uint8_t axis, double speed_rps);
-
-void setNeckAccel(uint8_t axis, double accel_rpss);
+void SetNeckPollData(void);
+void ResetNeckPollData(void);
+void SetNeckPosn(uint8_t axis, double pos_rad);
+void SetNeckSpeed(uint8_t axis, double speed_rps);
+void SetNeckAccel(uint8_t axis, double accel_rpss);
 
 
-eyeData_t* getEyeData(void);
+// Functions to interface with eye controller
+eyeData_t* GetEyeData(void);
+eyeCalData_t* GetEyeCalData(void);
+void SetEyePollData(void);
+void ResetEyePollData(void);
+void SetEyePosn(uint8_t axis, double pos_m);
+void SetEyeSpeed(uint8_t axis, double speed_mps);
+void SetEyeAccel(uint8_t axis, double accel_mpss);
+void StartEyeCal(uint8_t axis, double pos_m);
 
-eyeCalData_t* getEyeCalData(void);
+// Constructors/Destructor for the library
+void Start(void);
+void Cleanup(void);
 
-void enEyePollData(void);
-
-void disEyePollData(void);
-
-void setEyePos(uint8_t axis, double pos_m);
-
-void setEyeSpeed(uint8_t axis, double speed_mps);
-
-void setEyeAccel(uint8_t axis, double accel_mpss);
-
-void startEyeCal(uint8_t axis, double pos_m);
+// Wrapper functions for communication with motors
+void SendMotorCommandEye(msgType_t msgType, uint8_t id, uint8_t group);
+void SendMotorCommandNeck(msgType_t msgType, uint8_t id, uint8_t group);
+void GetDataMemEye(msgType_t msgType, uint8_t id, uint16_t regAddr);
+void GetDataMemNeck(msgType_t msgType, uint8_t id, uint16_t regAddr);
+void SetDataMemEye(msgType_t msgType, uint8_t axis_id, uint16_t regAddr, uint32_t data);
+void SetDataMemNeck(msgType_t msgType, uint8_t axis_id, uint16_t regAddr, uint32_t data);
 
 
-void start(void);
-
-void cleanup(void);
 #endif
