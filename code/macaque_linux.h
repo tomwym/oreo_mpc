@@ -15,7 +15,7 @@
 #define MAX_CMD_PEND 		        8  //must be a power of 2
 
 // Configurable settings for the motor controllers
-#define HOST_ID                     8
+#define HOST_ID                     88
 #define NECK_GROUP_ID		        1
 #define EYE_GROUP_ID		        2
 
@@ -39,7 +39,7 @@ typedef enum {
 
 // Axis id mapping
 typedef enum {
-    EYE_YAW_LEFT_AXIS,
+    EYE_YAW_LEFT_AXIS = 129,
     EYE_PITCH_LEFT_AXIS,
     EYE_PITCH_RIGHT_AXIS,
     EYE_YAW_RIGHT_AXIS,
@@ -132,6 +132,7 @@ typedef enum msgType
     CMD_SET_POSABS,
     CMD_SET_POSREL,
     CMD_SET_MASTERID,
+    NUM_CMDS,
 } msgType_t;
 
 

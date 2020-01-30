@@ -1,4 +1,7 @@
 /*
+Purpose: To provide build/parse functionalities for TML_CAN messages sent to
+technosoft motor controllers
+
 TODO:
 - add some error checking to GiveMeData messages to ensure asking for correct size
 - fix group id checking (Goto and GiveMeData2 messages)

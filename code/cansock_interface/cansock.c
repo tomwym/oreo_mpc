@@ -1,3 +1,7 @@
+/*
+Purpose: To provide usage of socketCAN library provided by Linux
+*/
+
 // _DEFAULT_SOURCE defined for ifreq struct
 #define _DEFAULT_SOURCE
 #include <stdint.h>

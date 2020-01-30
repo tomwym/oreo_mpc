@@ -113,4 +113,8 @@ void FormatUpdatePosn(CAN_MSG* frame, uint8_t id, uint8_t isGroup);
 // Set period to 0 to disable sync
 void FormatSetSync(CAN_MSG* frame, uint8_t group, uint32_t period);
 
+// Check for valid setup table
+void FormatSetupTable(CAN_MSG* frame, uint8_t axis);
+
+
 #endif

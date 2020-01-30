@@ -1,4 +1,5 @@
 /*
+    Purpose: Provide an interface to communicate with the motor controllers
     TODO:
     - Replace some of the defines with enums
     - Think about having a socket to rcv error frames
@@ -23,9 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <unistd.h>
-#include <time.h>
 
 #include <math.h>
 #include <sched.h>
@@ -77,7 +76,6 @@
 #define NECK_CAN_IFNAME             "can0"
 #define EYE_DEV_ID                  (0x80u)     // Is eye motor if MSB of source id in CAN_id is 1
 #define EYE_CAN_IFNAME              "can0"
-#define CONTROL_CAN_ID              (0x120u)
 #define IFNAME_LEN                  (4)
 #define DEV_ID_MASK                 (0x80u)
 #define HOST_ID_MASK                (0xFFu)
