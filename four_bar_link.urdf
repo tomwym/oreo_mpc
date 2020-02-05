@@ -1,0 +1,56 @@
+<robot name="four_bar_link">
+	<material name="blue">
+		<color rgba = "0 0 0.8 1"/>
+	</material>
+	
+	<material name="red">
+		<color rgba = "0.8 0 0 1"/>
+	</material>
+	
+	<material name="green">
+		<color rgba = "0 0.8 0 1"/>
+	</material>
+	
+	<material name="white">
+		<color rgba = "1 1 1 1"/>
+	</material>
+	
+	<link name = "link1" 
+		<visual>
+			<geometry>
+				<box size ="0.6 0.1 0.2"/>
+			</geometry>
+			<material name="blue"/>
+		</visual>
+	</link>
+	
+	<link name = "link2" />
+	</link>
+	
+	<link name = "link3" />
+	</link>
+	
+	<link name = "link4" />
+	</link>
+	
+	<joint name="joint1" type="continous">
+		<parent link="link1" />
+		<child link="link2" />
+		<origin xyz="5 3 0" rpy="0 0 0" />
+		<axis xyz="-0.9 0.15 0" />
+	</joint>
+
+	<joint name="joint2" type="continous">
+		<parent link="link1" />
+		<child link="link3" />
+		<origin xyz="-2 5 0" rpy="0 0 1.57" />
+		<axis xyz="-0.707 0.707 0" />
+	</joint>
+	
+	<joint name="joint3" type="continous">
+		<parent link="link3" />
+		<child link="link4" />
+		<origin xyz="5 0 0" rpy="0 0 -1.57" />
+		<axis xyz="0.707 -0.707 0" />
+	</joint>
+</robot>
