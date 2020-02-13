@@ -1,0 +1,28 @@
+<robot name="right_eye">
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="right_eye_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/right_eye_asm.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="99.77e-3"/>
+			<inertia ixx="24616.80e-9" ixy="819.44e-9" ixz="3572.05e-9" iyy="53681.02e-9" iyz="-755.92e-9" izz="52448.23e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="right_eye_link"/>
+	</joint>
+</robot>

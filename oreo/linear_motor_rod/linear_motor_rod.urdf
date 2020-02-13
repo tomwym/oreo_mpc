@@ -1,0 +1,28 @@
+<robot name="linear_motor_rod">
+    <material name="purple">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="linear_motor_rod_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/linear_motor_rod_assembly.STL"/>
+            </geometry>
+            <material name="purple"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="32.47e-3"/>
+			<inertia ixx="219.49e-9" ixy="-25.89e-9" ixz="0.03e-9" iyy="59215.55e-9" iyz="0.01e-9" izz="59246.15e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="linear_motor_rod_link"/>
+	</joint>
+</robot>

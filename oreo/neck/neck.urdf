@@ -1,0 +1,28 @@
+<robot name="neck">
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="neck_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Neck_asm.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="207.19e-3"/>
+			<inertia ixx="801982.44e-9" ixy="3034.04e-9" ixz="6392.90e-9" iyy="678687.19e-9" iyz="7406.98e-9" izz="135536.08e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="neck_link"/>
+	</joint>
+</robot>

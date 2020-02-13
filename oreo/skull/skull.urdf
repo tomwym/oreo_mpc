@@ -1,0 +1,28 @@
+<robot name="skull">
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="skull_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Skull.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="642.29e-3"/>
+			<inertia ixx="1214351.37e-9" ixy="13329.44e-9" ixz="-40635.65e-9" iyy="1635371.86e-9" iyz="-25764.25e-9" izz="1270249.78e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="skull_link"/>
+	</joint>
+</robot>

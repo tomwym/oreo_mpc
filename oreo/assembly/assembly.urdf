@@ -1,0 +1,160 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="test" name="oreo_assembly">
+    <material name="blue">
+        <color rgba="0 0 1 1"/>
+    </material>
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+    <material name="purple">
+        <color rgba="0.5 0 0.5 1"/>
+    </material>
+    
+    <xacro:macro name="linear_motor_rod" params="suffix joint_y is_left">
+        <xacro:property name="rod_pitch" value="-0.30682"/>
+        <link name ="linear_motor_rod_link_${suffix}">
+            <visual>
+                <origin xyz="6.81e-3 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/linear_motor_rod_assembly.STL"/>
+                </geometry>
+                <material name="blue"/>
+            </visual>
+            <inertial>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <mass value="32.47e-3"/>
+                <inertia ixx="219.49e-9" ixy="-25.89e-9" ixz="0.03e-9" iyy="59215.55e-9" iyz="0.01e-9" izz="59246.15e-9"/>
+            </inertial>
+        </link>
+        <joint name="linear_motor_rod_joint_${suffix}" type="prismatic">
+            <origin xyz="-63.32e-3 ${joint_y} 32.08e-3" rpy="${is_left*3.1415} ${rod_pitch} 0"/>
+            <axis xyz="1 0 0"/>
+            <limit effort="30" velocity="1.0" lower="-23.4e-3" upper="23.4e-3"/> 
+            <parent link="skull_link"/>
+            <child link="linear_motor_rod_link_${suffix}"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="dogbone" params="suffix is_left">
+        <xacro:property name="dogbone_pitch" value="-0.566"/>
+        <link name ="dogbone_link_${suffix}">
+        <visual>
+            <origin xyz="30.25e-3 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/dogbone.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="3.93e-3"/>
+            <inertia ixx="8.36e-9" ixy="0" ixz="0" iyy="961.09e-9" iyz="0" izz="961.09e-9"/>
+        </inertial>
+    </link>
+    <joint name="dogbone_joint_${suffix}" type="continuous">
+        <origin xyz="79.09e-3 0 0" rpy="${is_left*3.1415} ${-1*dogbone_pitch + is_left*2*dogbone_pitch} 0"/>
+        <axis xyz="1 0 0"/>
+        <parent link="linear_motor_rod_link_${suffix}"/>
+        <child link="dogbone_link_${suffix}"/>
+    </joint>
+    </xacro:macro>
+                    
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Base_asm.STL"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="960.94e-3"/>
+			<inertia ixx="1920180.36e-9" ixy="-4377.79e-9" ixz="50887.44e-9" iyy="1940290.2e-9" iyz="50887.4e-9" izz="1720792.46e-9"/>
+		</inertial>
+    </link>
+    <joint name="base_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="base_link"/>
+	</joint>
+
+    <link name ="neck_link">
+        <visual>
+            <origin xyz="0.28e-3 0.39e-3 75.87e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Neck_asm.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="207.19e-3"/>
+			<inertia ixx="801982.44e-9" ixy="3034.04e-9" ixz="6392.90e-9" iyy="678687.19e-9" iyz="7406.98e-9" izz="135536.08e-9"/>
+		</inertial>
+    </link>
+    <joint name="neck_joint" type="continuous">
+        <origin xyz="35.81e-3 -0.67e-3 -2.27e-3" rpy="0 0 0"/>
+        <axis xyz="0 0 1" rpy="0 0 0"/>
+        <parent link="base_link"/>
+        <child link="neck_link"/>
+    </joint>
+
+    <link name="pitch_piece_link">
+        <visual>
+            <origin xyz="2.22e-3 -40.85e-3 -0.01e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/pitch_piece.STL"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="148.50e-3"/>
+			<inertia ixx="74183.85e-9" ixy="-1077.69e-9" ixz="32.52e-9" iyy="15190.93e-9" iyz="41.48e-9" izz="82029.85e-9"/>
+		</inertial>
+    </link>
+    <joint name="pitch_piece_joint" type="continuous">
+        <origin xyz="0 44.45e-3 174.99e-3" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="neck_link"/>
+        <child link="pitch_piece_link"/>
+    </joint>
+    
+    <link name ="skull_link">
+        <visual>
+            <origin xyz="-49.79e-3 -1.02e-3 43.76e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Skull.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="642.29e-3"/>
+			<inertia ixx="1214351.37e-9" ixy="13329.44e-9" ixz="-40635.65e-9" iyy="1635371.86e-9" iyz="-25764.25e-9" izz="1270249.78e-9"/>
+		</inertial>
+    </link>
+    <joint name="skull_joint" type="continuous">
+        <origin xyz="28.58e-3 -44.45e-3 0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <parent link="pitch_piece_link"/>
+        <child link="skull_link"/>
+    </joint>
+
+    <xacro:linear_motor_rod suffix="far_left" joint_y="43.5e-3" is_left="1"/>
+    <xacro:linear_motor_rod suffix="mid_left" joint_y="14.5e-3" is_left="1"/>
+    <xacro:linear_motor_rod suffix="mid_right" joint_y="-14.5e-3" is_left="0"/>
+    <xacro:linear_motor_rod suffix="far_right" joint_y="-43.5e-3" is_left="0"/>
+
+    <xacro:dogbone suffix="far_left" is_left="1"/>
+    <xacro:dogbone suffix="mid_left" is_left="1"/>
+    <xacro:dogbone suffix="mid_right" is_left="0"/>
+    <xacro:dogbone suffix="far_right" is_left="0"/>
+
+    
+    
+</robot>

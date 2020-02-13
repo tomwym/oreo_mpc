@@ -1,0 +1,28 @@
+<robot name="base">
+    <material name="blue">
+        <color rgba="0 0 0.8 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="base_link">
+        <visual>
+            
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Base_asm.STL"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="960.94e-3"/>
+			<inertia ixx="1920180.36e-9" ixy="-4377.79e-9" ixz="50887.44e-9" iyy="1940290.2e-9" iyz="50887.4e-9" izz="1720792.46e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="base_link"/>
+	</joint>
+</robot>

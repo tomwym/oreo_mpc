@@ -1,0 +1,28 @@
+<robot name="pitch_piece">
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="pitch_piece_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/pitch_piece.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="148.50e-3"/>
+			<inertia ixx="74183.85e-9" ixy="-1077.69e-9" ixz="32.52e-9" iyy="15190.93e-9" iyz="41.48e-9" izz="82029.85e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="pitch_piece_link"/>
+	</joint>
+</robot>

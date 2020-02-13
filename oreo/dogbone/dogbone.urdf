@@ -1,0 +1,27 @@
+<robot name="dogbone">
+    <material name="red">
+        <color rgba="1 0 0 1"/>
+    </material>
+
+    <link name="dummy_link">
+    </link>
+
+    <link name ="dogbone_link">
+        <visual>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/dogbone.STL"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+        <inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="3.93e-3"/>
+			<inertia ixx="8.36e-9" ixy="0" ixz="0" iyy="961.09e-9" iyz="0" izz="961.09e-9"/>
+		</inertial>
+    </link>
+
+    <joint name="dummy_joint" type="fixed">
+		<parent link="dummy_link"/>
+		<child link="dogbone_link"/>
+	</joint>
+</robot>
