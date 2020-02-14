@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="test" name="oreo_assembly">
+<!-- Robot definition for configuration option #2-->
     <material name="blue">
         <color rgba="0 0 1 1"/>
     </material>
     <material name="red">
         <color rgba="1 0 0 1"/>
     </material>
-    <material name="purple">
-        <color rgba="0.5 0 0.5 1"/>
+    <material name="green">
+        <color rgba="0 1 0 1"/>
     </material>
     
     <xacro:macro name="linear_motor_rod" params="suffix joint_y is_left">
@@ -16,7 +17,7 @@
             <visual>
                 <origin xyz="6.81e-3 0 0" rpy="0 0 0"/>
                 <geometry>
-                    <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/linear_motor_rod_assembly.STL"/>
+                    <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/linear_motor_rod_assembly.STL"/>
                 </geometry>
                 <material name="blue"/>
             </visual>
@@ -37,11 +38,12 @@
 
     <xacro:macro name="dogbone" params="suffix is_left">
         <xacro:property name="dogbone_pitch" value="-0.566"/>
+        <xacro:property name="dogbone_yaw" value="-0.06"/>
         <link name ="dogbone_link_${suffix}">
         <visual>
             <origin xyz="30.25e-3 0 0" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/dogbone.STL"/>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/dogbone.STL"/>
             </geometry>
             <material name="red"/>
         </visual>
@@ -52,8 +54,8 @@
         </inertial>
     </link>
     <joint name="dogbone_joint_${suffix}" type="continuous">
-        <origin xyz="79.09e-3 0 0" rpy="${is_left*3.1415} ${-1*dogbone_pitch + is_left*2*dogbone_pitch} 0"/>
-        <axis xyz="1 0 0"/>
+        <origin xyz="79.09e-3 0 0" rpy="${is_left*3.1415} ${-1*dogbone_pitch + is_left*2*dogbone_pitch} ${-1*dogbone_yaw + is_left*2*dogbone_yaw}"/>
+        <axis xyz="0 0 1"/>
         <parent link="linear_motor_rod_link_${suffix}"/>
         <child link="dogbone_link_${suffix}"/>
     </joint>
@@ -67,7 +69,7 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Base_asm.STL"/>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/Base_asm.STL"/>
             </geometry>
             <material name="blue"/>
         </visual>
@@ -86,7 +88,7 @@
         <visual>
             <origin xyz="0.28e-3 0.39e-3 75.87e-3" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Neck_asm.STL"/>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/Neck_asm.STL"/>
             </geometry>
             <material name="red"/>
         </visual>
@@ -107,7 +109,7 @@
         <visual>
             <origin xyz="2.22e-3 -40.85e-3 -0.01e-3" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/pitch_piece.STL"/>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/pitch_piece.STL"/>
             </geometry>
             <material name="blue"/>
         </visual>
@@ -128,7 +130,7 @@
         <visual>
             <origin xyz="-49.79e-3 -1.02e-3 43.76e-3" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/stl/Skull.STL"/>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/Skull.STL"/>
             </geometry>
             <material name="red"/>
         </visual>
@@ -155,6 +157,87 @@
     <xacro:dogbone suffix="mid_right" is_left="0"/>
     <xacro:dogbone suffix="far_right" is_left="0"/>
 
-    
-    
+    <link name="left_eye_yolk_link">
+        <visual>
+            <origin xyz="-3.54e-3 0.26e-3 40.14e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/left_eye_yolk_asm.STL"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="26.61e-3"/>
+			<inertia ixx="16705.86e-9" ixy="23.76e-9" ixz="-7973.22e-9" iyy="22689.47e-9" iyz="39.74e-9" izz="25867.64e-9"/>
+		</inertial>
+    </link>
+    <joint name="left_eye_yolk_joint" type="continuous">
+        <origin xyz="52e-3 29e-3 -24.96e-3" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="skull_link"/>
+        <child link="left_eye_yolk_link"/>
+    </joint>
+
+    <link name ="left_eye_link">
+        <visual>
+            <origin xyz="3.34e-3 -17.01e-3 -0.23e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/left_eye_asm.STL"/>
+            </geometry>
+            <material name="green"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="99.78e-3"/>
+			<inertia ixx="24413.40e-9" ixy="-2665.82e-9" ixz="3572.63e-9" iyy="53686.40e-9" iyz="-904.33e-9" izz="52249.45e-9"/>
+		</inertial>
+    </link>
+    <joint name="left_eye_joint" type="continuous">
+        <origin xyz="0 18.45e-3 45.97e-3" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="left_eye_yolk_link"/>
+        <child link="left_eye_link"/>
+    </joint>
+
+    <link name ="right_eye_yolk_link">
+        <visual>
+            <origin xyz="6.79e-3 -0.26e-3 45.32e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/right_eye_yolk_asm.STL"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="26.61e-3"/>
+			<inertia ixx="30380.04e-9" ixy="46.20e-9" ixz="1367.11e-9" iyy="22689.47e-9" iyz="-4.74e-9" izz="12193.47e-9"/>
+		</inertial>
+    </link>
+    <joint name="right_eye_yolk_joint" type="continuous">
+        <origin xyz="52e-3 -29e-3 -24.96e-3" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="skull_link"/>
+        <child link="right_eye_yolk_link"/>
+    </joint>
+
+    <link name ="right_eye_link">
+        <visual>
+            <origin xyz="3.34e-3 18.23e-3 -0.23e-3" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file:///home/oreo/Documents/oreo_sim/oreo/assembly/stl/right_eye_asm.STL"/>
+            </geometry>
+            <material name="green"/>
+        </visual>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+			<mass value="99.77e-3"/>
+			<inertia ixx="24616.80e-9" ixy="819.44e-9" ixz="3572.05e-9" iyy="53681.02e-9" iyz="-755.92e-9" izz="52448.23e-9"/>
+		</inertial>
+    </link>
+    <joint name="right_eye_link" type="continuous">
+        <origin xyz="0 -18.45e-3 45.97e-3" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="right_eye_yolk_link"/>
+        <child link="right_eye_link"/>
+    </joint>
 </robot>
