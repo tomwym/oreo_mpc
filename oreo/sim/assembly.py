@@ -48,6 +48,7 @@ p.resetJointState(linkage, jointInfoList['linear_motor_rod_joint_far_left'], tar
 p.resetJointState(linkage, jointInfoList['linear_motor_rod_joint_mid_left'], targetValue = 0)
 p.resetJointState(linkage, jointInfoList['linear_motor_rod_joint_mid_right'], targetValue = 0)
 p.resetJointState(linkage, jointInfoList['linear_motor_rod_joint_far_right'], targetValue = 0)
+p.resetJointState(linkage, jointInfoList['skull_joint'], targetValue = 0)
 p.resetJointState(linkage, jointInfoList['left_eye_yolk_joint'], targetValue = 0)
 p.resetJointState(linkage, jointInfoList['left_eye_joint'], targetValue = 0)
 p.resetJointState(linkage, jointInfoList['right_eye_yolk_joint'], targetValue = 0)
@@ -97,6 +98,7 @@ p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_left'
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_left'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_right'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_right'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
+p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['left_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
 p.setJointMotorControl2(linkage, jointInfoList['left_eye_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
 p.setJointMotorControl2(linkage, jointInfoList['right_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
@@ -117,6 +119,7 @@ p.resetJointStateMultiDof(linkage, jointInfoList['dogbone_joint_far_right'], tar
 joint_ctrl = {}
 neck_ctrl = p.addUserDebugParameter("neck_joint", -1.57, 1.57, 0)
 pitch_piece_ctrl = p.addUserDebugParameter("pitch_piece_joint", -1.57, 1.57, 0)
+skull_ctrl = p.addUserDebugParameter("skull_joint", -1.57, 1.57, 0)
 linear_motor_far_left_ctrl = p.addUserDebugParameter("motor_rod_joint_far_left", -0.1, 0.1, 0)
 linear_motor_mid_left_ctrl = p.addUserDebugParameter("motor_rod_joint_mid_left", -0.1, 0.1, 0)
 linear_motor_far_right_ctrl = p.addUserDebugParameter("motor_rod_joint_far_right", -0.1, 0.1, 0)
@@ -133,6 +136,7 @@ while (1):
     linear_motor_far_left_posn = p.readUserDebugParameter(linear_motor_far_left_ctrl)
     linear_motor_mid_right_posn = p.readUserDebugParameter(linear_motor_mid_right_ctrl)
     linear_motor_mid_left_posn = p.readUserDebugParameter(linear_motor_mid_left_ctrl)
+    skull_posn = p.readUserDebugParameter(skull_ctrl)
 
     # Set joints to user-defined positions
     p.setJointMotorControl2(linkage, jointInfoList['neck_joint'], targetPosition = neck_posn, controlMode = ctrl_mode, force = maxforce)
@@ -141,6 +145,7 @@ while (1):
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_left'], targetPosition = linear_motor_mid_left_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_right'], targetPosition = linear_motor_mid_right_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_right'], targetPosition = linear_motor_far_right_posn, controlMode = ctrl_mode, force = maxforce)
+    p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = skull_posn, controlMode = ctrl_mode, force = maxforce)
     
 
 

@@ -114,8 +114,9 @@
             </geometry>
         </collision>
     </link>
-    <joint name="skull_joint" type="fixed">
+    <joint name="skull_joint" type="continuous">
         <origin xyz="28.58e-3 -44.45e-3 0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
         <parent link="pitch_piece_link"/>
         <child link="skull_link"/>
     </joint>
