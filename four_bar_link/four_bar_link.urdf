@@ -85,6 +85,7 @@
 			<material name="white"/>
 		</visual>
 		<inertial>
+			<origin xyz="0.275 0 0" rpy="0 0 0" />
 			<mass value="1"/>
 			<inertia ixx="1e-3" ixy="1e-3" ixz="1e-3" iyy="1e-3" iyz="1e-3" izz="1e-3"/>
 		</inertial>

@@ -22,14 +22,14 @@ for i in range(numJoints):
     print(jointInfo[0])
 
 # Set some positions
-p.resetJointState(linkage, jointInfoList['joint1'], -1.57)
-p.resetJointState(linkage, jointInfoList['joint2'], -1.57)
-p.resetJointState(linkage, jointInfoList['joint3'], -1.57)
+#p.resetJointState(linkage, jointInfoList['joint1'], -1.57)
+#p.resetJointState(linkage, jointInfoList['joint2'], -1.57)
+#p.resetJointState(linkage, jointInfoList['joint3'], -1.57)
 
 p.setGravity(0,0,-9.8)
 
 # Constraint to close the kinematic loop
-cid = p.createConstraint(linkage, jointInfoList['dummy_joint'], linkage, jointInfoList['joint3'], p.JOINT_POINT2POINT, [0,0,0], [-0.275, 0.005,0],[0.55,-0.005,0])
+cid = p.createConstraint(linkage, jointInfoList['dummy_joint'], linkage, jointInfoList['joint3'], p.JOINT_POINT2POINT, [0,0,0], [-0.275, 0.005,0],[0.275,-0.005,0])
 p.changeConstraint(cid, maxForce=1000000)
 print(cid)
 
