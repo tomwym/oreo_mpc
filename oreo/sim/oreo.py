@@ -11,6 +11,7 @@ class Oreo_Robot(object):
     physicsClient = 0
     numJoints = 0
     jointDict = {}
+    useRealTime = False
 
     numConstraints = 4
     constraintList = []
@@ -65,18 +66,30 @@ class Oreo_Robot(object):
                     ['dogbone_joint_far_left', 'left_eye_joint'],
                     ['dogbone_joint_mid_left', 'left_eye_joint'],
                     ['dogbone_joint_mid_right', 'right_eye_joint'],
-                    ['dogbone_joint_far_right', 'right_eye_joint'], 
+                    ['dogbone_joint_far_right', 'right_eye_joint'],
+                    ['left_eye_joint', 'right_eye_joint'],
+                    ['left_eye_yolk_joint', 'right_eye_yolk_joint'],
+                    ['left_eye_yolk_joint', 'right_eye_joint'],
+                    ['right_eye_yolk_joint', 'left_eye_joint'],
+                    ['skull_joint', 'pitch_piece_joint'],
+                    ['dogbone_joint_far_right', 'pitch_piece_joint'],
+                    ['dogbone_joint_far_left', 'pitch_piece_joint']
+
     ]
+    
 
     # Constants
     INIT_POS = [0,0,0]
     INIT_ORN = [0,0,0]
     CONSTRAINT_MAX_FORCE = 100
     JOINT_MAX_FORCE = 100
+    TORQUE_CONTROL = 0
+    POSITION_CONTROL = 1
+    TIME_STEP = 1/240
 
 
     # Constructor
-    def __init__(self, enableDebug, enableGUI, urdfPath, urdfName) :
+    def __init__(self, enableDebug, enableGUI, urdfPath, urdfName, enableRealTime) :
         # Init logging
         if(enableDebug) :
             logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
@@ -91,8 +104,9 @@ class Oreo_Robot(object):
         else :
             self.physicsClient = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(urdfPath)
-        urdf_flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER
+        urdf_flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER | p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES
         self.linkage = p.loadURDF(urdfName, self.INIT_POS, p.getQuaternionFromEuler(self.INIT_ORN), useFixedBase = 1, flags = urdf_flags)
+        self.useRealTime = enableRealTime
 
     # Go to home position
     def HomePos(self) :
@@ -114,55 +128,132 @@ class Oreo_Robot(object):
 
     # Enable/Disable collision
     def ToggleCollision(self, enable):
-        state = 0
-        if enable:
-            state = 1
+        if enable > 0:
+            logging.debug("Collision enabled")
+            enable = 1
+        else :
+            logging.debug("Collision disabled")
+            enable = 0
         for i in range(len(self.collisionLinks)) :
-            p.setCollisionFilterPair(self.linkage, self.linkage, self.jointDict[self.collisionLinks[i][0]], self.jointDict[self.collisionLinks[i][1]], state)
+            p.setCollisionFilterPair(self.linkage, self.linkage, self.jointDict[self.collisionLinks[i][0]], self.jointDict[self.collisionLinks[i][1]], enable)
+            logging.debug("Collision pair: %s %s", self.collisionLinks[i][0], self.collisionLinks[i][1])
+        print()
+        print()
+    
+    # Toggle Sim type
+    def SetSimType(self, realTime) :
+        # Set sim type
+        if realTime:
+            self.useRealTime = True
+            p.setRealTimeSimulation(1)
+            logging.debug("Setting real time sim")
+        else :
+            self.useRealTime = False
+            p.setRealTimeSimulation(0)
+            p.setTimeStep(self.TIME_STEP)
+            logging.debug("Setting step sim with timestep %d", self.TIME_STEP)
+    
+    # Reset actuated joint control
+    def ResetActJointControl(self) :
+        # Must set to velocity control with 0 velocity and 0 force to "reset"
+        p.setJointMotorControlArray(self.linkage, self.actJointIds, p.VELOCITY_CONTROL, forces = [0]*self.actJointNum)
+
+    # Initialize robot for position control
+    def InitPosnCtrl(self) :
+        self.SetActJointControlType(self.POSITION_CONTROL)
+        self.ResetActJointControl()
+        self.ControlActJoints([0]*self.actJointNum)
+
+    #Initialize robot for torque control
+    def InitTorqueCtrl(self) :
+        self.SetActJointControlType(self.TORQUE_CONTROL)
+        self.ResetActJointControl()
+        self.ControlActJoints([0]*self.actJointNum)        
+
+    # Set actuated joint control type
+    def SetActJointControlType(self, ctrl_type) :
+        if ctrl_type == self.TORQUE_CONTROL :
+            self.actJointControl = p.TORQUE_CONTROL
+            logging.debug("Set torque control")
+            # Must be step sim for torque control
+            self.SetSimType(False)
+        else :
+            self.actJointControl = p.POSITION_CONTROL
+            logging.debug("Set position control")
 
     # Set joint control for actuators
-    def ControlActJoints(self) :
-        p.setJointMotorControlArray(self.linkage, self.actJointIds, self.actJointControl, targetPositions = self.actJointPos, forces = [self.JOINT_MAX_FORCE]*self.actJointNum)
+    def ControlActJoints(self, control) :
+        target = []
+        links = []
+        if isinstance(control, list) :
+            for idx in range(len(control)) :
+                target.append(control[idx])
+            links = self.actJointIds
+        elif isinstance(control, dict) :
+            for name in control :
+                if name in self.actJointNames:
+                    target.append(control[name])
+                    links.append(self.jointDict[name])
+                else :
+                    logging.warning("Unknown dict key in control input for ControlActJoints")
+        else :
+            logging.error("Unknown control input type")
+
+        if self.actJointControl == p.POSITION_CONTROL :
+            p.setJointMotorControlArray(self.linkage, links, self.actJointControl, targetPositions = target, forces = [self.JOINT_MAX_FORCE]*len(target))
+        elif self.actJointControl == p.TORQUE_CONTROL :
+            p.setJointMotorControlArray(self.linkage, links, self.actJointControl, forces = target)
+
+        # Update simulation
+        if self.useRealTime == False :
+            p.stepSimulation()
+
+        return 0
 
     # Set joint control for dumb joints
     def ControlDumbJoints(self) :
         p.setJointMotorControlArray(self.linkage, self.dumbJointIds, self.dumbJointControl, targetVelocities = [self.dumbJointVelo]*self.dumbJointNum, forces = [self.dumbJointForce]*self.dumbJointNum)
 
+    # Set joint control for spherical joints
     def ControlSpherJoints(self) :
         p.setJointMotorControlMultiDofArray(self.linkage, self.spherJointIds, self.spherJointControl, targetPositions = [self.spherJointPos]*self.spherJointNum, targetVelocities = [self.spherJointVelo]*self.spherJointNum, forces = [self.spherJointForce]*self.spherJointNum, positionGains = [self.spherJointKp]*self.spherJointNum, velocityGains = [self.spherJointKv]*self.spherJointNum)
 
     # Init manual control
     def InitManCtrl(self) :
-        for idx in range(self.actJointNum):
+        self.InitPosnCtrl()
+        for idx in range(self.actJointNum) :
             name = self.actJointNames[idx]
             if "linear" in name:
                 self.manCtrl.append(p.addUserDebugParameter(name, self.prismaticLim[self.LIM_MIN_IDX], self.prismaticLim[self.LIM_MAX_IDX]))
             else :
                 self.manCtrl.append(p.addUserDebugParameter(name, self.revoluteLim[self.LIM_MIN_IDX], self.revoluteLim[self.LIM_MAX_IDX]))
-        p.setRealTimeSimulation(1)
-
+        
     # Update manual control
     def UpdManCtrl(self) :
+        pos = [0]*self.actJointNum
         for idx in range(len(self.manCtrl)) :
-            self.actJointPos[idx] = p.readUserDebugParameter(self.manCtrl[idx])
-        self.ControlActJoints()
+            pos[idx] = p.readUserDebugParameter(self.manCtrl[idx])
+        self.ControlActJoints(pos)
+        self.actJointPos = pos
 
     # Initialize robot model
-    def InitModel(self, enableCollision) :
+    def InitModel(self) :
         # Map names to id
         self.numJoints = p.getNumJoints(self.linkage)
         logging.info("There are %d links in file\n", self.numJoints)
+        vis_data = p.getVisualShapeData(self.linkage)
         for i in range(self.numJoints):
             jointInfo = p.getJointInfo(self.linkage, i)
-            self.jointDict[jointInfo[1].decode('UTF-8')] = jointInfo[0]        
+            self.jointDict[jointInfo[1].decode('UTF-8')] = i        
             state = p.getLinkState(self.linkage, jointInfo[0])
-            coll_data = p.getCollisionShapeData(self.linkage, jointInfo[0])
+            coll_data = p.getCollisionShapeData(self.linkage, i)
             logging.debug("%s %d", jointInfo[1].decode('UTF-8'), i)
-            logging.debug("com frame (posn & orn) %s %s", str(state[0]), str(p.getEulerFromQuaternion(state[1])))
-            logging.debug("inertial offset (posn & orn) %s %s", str(state[2]), str(p.getEulerFromQuaternion(state[3])))
-            logging.debug("link frame (posn & orn) %s %s", str(state[4]), str(p.getEulerFromQuaternion(state[5])))
+            logging.debug("com frame (posn (global) & orn (global)) %s %s", str(state[0]), str(p.getEulerFromQuaternion(state[1])))
+            logging.debug("inertial offset (posn (link frame), orn (link frame)) %s %s", str(state[2]), str(p.getEulerFromQuaternion(state[3])))
+            logging.debug("link frame (posn (global), orn (global)) %s %s", str(state[4]), str(p.getEulerFromQuaternion(state[5])))
             logging.debug("type %s", str(jointInfo[2]))
-            logging.debug("collision (path, posn, orn) %s \n\n", str(coll_data))
+            logging.debug("collision (posn (COM frame), orn(COM frame)) %s %s", str(coll_data[0][5]), str(p.getEulerFromQuaternion(coll_data[0][6])))
+            logging.debug("visual (posn (link frame), orn(link frame)) %s %s\n\n", str(vis_data[i][5]), str(p.getEulerFromQuaternion(vis_data[i][6])))
     
         # Create list of actuated joints
         self.actJointIds = [self.jointDict[act_name] for act_name in self.actJointNames]
@@ -176,8 +267,8 @@ class Oreo_Robot(object):
         self.dumbJointIds = [self.jointDict[dumb_name] for dumb_name in self.dumbJointNames]
         self.dumbJointNum = len(self.dumbJointNames)
 
-        # Set collision characteristics
-        self.ToggleCollision(enableCollision)
+        # Enable collision by default
+        self.ToggleCollision(1)
 
         # Go to home position
         self.HomePos()
@@ -190,9 +281,39 @@ class Oreo_Robot(object):
             p.changeConstraint(self.constraintList[i], maxForce = self.CONSTRAINT_MAX_FORCE)
 
         # Set joint control
-        self.ControlActJoints()
+        self.SetActJointControlType(self.POSITION_CONTROL)
+        self.ResetActJointControl()
         self.ControlDumbJoints()
         self.ControlSpherJoints()
 
         # Gravity
-        p.setGravity(0,0,-9.8)      
+        p.setGravity(0,0,-9.8)
+
+        # Simulation type
+        self.SetSimType(self.useRealTime)
+    
+    # Check if links have collided
+    def QueryCollision(self, linkA, linkB) :
+        points = p.getContactPoints(bodyA = self.linkage, bodyB = self.linkage, linkIndexA = self.jointDict[linkA], linkIndexB = self.jointDict[linkB])
+        if not points :
+            return False
+        else :
+            logging.debug("Number of collision points between %s & %s detected: %d\n", linkA, linkB, len(points))
+            return True
+    
+    # Listen for keyboard event
+    def QueryKeyEvent(self, char) :
+        key = ord(char)
+        events = p.getKeyboardEvents()
+        if key in events and events[key]&p.KEY_WAS_TRIGGERED :
+            return True
+        return False
+
+    # Cleanup stuff
+    def Cleanup(self) :
+        p.disconnect()
+    
+    # Reset robot
+    def Reset(self) :
+        p.resetSimulation()
+        self.InitModel() 
