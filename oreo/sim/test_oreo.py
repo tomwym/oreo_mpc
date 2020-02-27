@@ -7,20 +7,21 @@ import oreo as o
 
 def ManCtrl(robot) :
     robot.InitManCtrl()
-
+    robot.RegKeyEvent(['c', 'q', 'd'])
     while (1):
         robot.UpdManCtrl()
-        if robot.QueryKeyEvent('c') :
-            # query collision
-            if(robot.QueryCollision('left_eye_joint', 'right_eye_joint')) :
-                print("left eye and right eye collision detected")
-        if robot.QueryKeyEvent('q') :
+        keys = robot.GetKeyEvents()
+        if 'c' in keys :
+            robot.QueryAllCollisions()
+        if 'q' in keys :
             # quit
             break
+        if 'd' in keys :
+            robot.QueryConstraint()
 
 def TorqueCtrl(robot) :
     robot.InitTorqueCtrl()
-
+    robot.RegKeyEvent(['c', 'q', 'd'])
     cnt = 0
     torque = 1
     force = 0
@@ -34,8 +35,16 @@ def TorqueCtrl(robot) :
             cnt = 0
         
         robot.ControlActJoints(ctrl_dict)
-        t.sleep(0.1)
         cnt += 1
+        
+        keys = robot.GetKeyEvents()
+        if 'c' in keys :
+            robot.QueryJointDynamics()
+        if 'q' in keys :
+            # quit
+            break
+        if 'd' in keys :
+            robot.QueryConstraint()
 
 robot = o.Oreo_Robot(True, True, "/home/oreo/Documents/oreo_sim/oreo/sim", "assembly.urdf", True)
 robot.InitModel()
@@ -45,6 +54,10 @@ if man_ctrl :
     ManCtrl(robot)
 else :
     TorqueCtrl(robot)
+
+robot.Cleanup()
+
+
 
 
 

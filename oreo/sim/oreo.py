@@ -14,15 +14,16 @@ class Oreo_Robot(object):
     useRealTime = False
 
     numConstraints = 4
-    constraintList = []
+    constraintDict = {}
     constraintLinks = [
-                        ['left_eye_joint', 'dogbone_joint_far_left'],
-                        ['left_eye_joint', 'dogbone_joint_mid_left'],
-                        ['right_eye_joint', 'dogbone_joint_mid_right'],
-                        ['right_eye_joint', 'dogbone_joint_far_right'], 
+                        ['left_eye_joint', 'dogbone_joint_far_left', 'constraint_far_left'],
+                        ['left_eye_joint', 'dogbone_joint_mid_left', 'constraint_mid_left'],
+                        ['right_eye_joint', 'dogbone_joint_mid_right', 'constraint_mid_right'],
+                        ['right_eye_joint', 'dogbone_joint_far_right', 'constraint_far_right'], 
                       ]
     PARENT_IDX = 0
     CHILD_IDX = 1
+    NAME_IDX = 2
     constraintParentPos = [[0.015, -0.0016, 0.0245], [0.0126, -0.0257, 0.0095], [0.0134, 0.0025, 0.0262], [0.0143, -0.0224, 0.0124]] # pos on eye
     constraintChildPos = [30.25e-3, 0, 0]   # pos on dogbone
     constraintAxis = [0,0,0]
@@ -60,32 +61,39 @@ class Oreo_Robot(object):
     spherJointKv = 1
     spherJointForce = [0,0,0]
 
-    
+    disCollisionLinks = [
+        ['dogbone_joint_far_left', 'left_eye_joint'],
+        ['dogbone_joint_mid_left', 'left_eye_joint'],
+        ['dogbone_joint_mid_right', 'right_eye_joint'],
+        ['dogbone_joint_far_right', 'right_eye_joint'],
+        ['dogbone_joint_far_left', 'left_eye_yolk_joint'],
+        ['dogbone_joint_mid_left', 'left_eye_yolk_joint'],
+        ['dogbone_joint_mid_right', 'right_eye_yolk_joint'],
+        ['dogbone_joint_far_right', 'right_eye_yolk_joint'],
+    ]
 
-    collisionLinks = [
-                    ['dogbone_joint_far_left', 'left_eye_joint'],
-                    ['dogbone_joint_mid_left', 'left_eye_joint'],
-                    ['dogbone_joint_mid_right', 'right_eye_joint'],
-                    ['dogbone_joint_far_right', 'right_eye_joint'],
-                    ['left_eye_joint', 'right_eye_joint'],
-                    ['left_eye_yolk_joint', 'right_eye_yolk_joint'],
-                    ['left_eye_yolk_joint', 'right_eye_joint'],
-                    ['right_eye_yolk_joint', 'left_eye_joint'],
-                    ['skull_joint', 'pitch_piece_joint'],
-                    ['dogbone_joint_far_right', 'pitch_piece_joint'],
-                    ['dogbone_joint_far_left', 'pitch_piece_joint']
+    toggCollisionLinks = [
+        ['left_eye_joint', 'right_eye_joint'],
+        ['left_eye_yolk_joint', 'right_eye_yolk_joint'],
+        ['left_eye_yolk_joint', 'right_eye_joint'],
+        ['right_eye_yolk_joint', 'left_eye_joint'],
+        ['skull_joint', 'pitch_piece_joint'],
+        ['dogbone_joint_far_right', 'pitch_piece_joint'],
+        ['dogbone_joint_far_left', 'pitch_piece_joint']
 
     ]
     
+    keys = []
 
     # Constants
     INIT_POS = [0,0,0]
     INIT_ORN = [0,0,0]
-    CONSTRAINT_MAX_FORCE = 100
+    CONSTRAINT_MAX_FORCE = 10000000
     JOINT_MAX_FORCE = 100
     TORQUE_CONTROL = 0
     POSITION_CONTROL = 1
     TIME_STEP = 1/240
+    DYN_STATE_SIZE = 6
 
 
     # Constructor
@@ -104,7 +112,7 @@ class Oreo_Robot(object):
         else :
             self.physicsClient = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(urdfPath)
-        urdf_flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER | p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES
+        urdf_flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER | p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS
         self.linkage = p.loadURDF(urdfName, self.INIT_POS, p.getQuaternionFromEuler(self.INIT_ORN), useFixedBase = 1, flags = urdf_flags)
         self.useRealTime = enableRealTime
 
@@ -128,15 +136,20 @@ class Oreo_Robot(object):
 
     # Enable/Disable collision
     def ToggleCollision(self, enable):
+        # Turn off some collisions
+        for j in range(len(self.disCollisionLinks)) :
+            p.setCollisionFilterPair(self.linkage, self.linkage, self.jointDict[self.disCollisionLinks[j][0]], self.jointDict[self.disCollisionLinks[j][1]], 0)
+        
         if enable > 0:
             logging.debug("Collision enabled")
             enable = 1
         else :
             logging.debug("Collision disabled")
             enable = 0
-        for i in range(len(self.collisionLinks)) :
-            p.setCollisionFilterPair(self.linkage, self.linkage, self.jointDict[self.collisionLinks[i][0]], self.jointDict[self.collisionLinks[i][1]], enable)
-            logging.debug("Collision pair: %s %s", self.collisionLinks[i][0], self.collisionLinks[i][1])
+        for i in range(len(self.toggCollisionLinks)) :
+            p.setCollisionFilterPair(bodyUniqueIdA = self.linkage, bodyUniqueIdB = self.linkage, linkIndexA = self.jointDict[self.toggCollisionLinks[i][0]], linkIndexB = self.jointDict[self.toggCollisionLinks[i][1]], enableCollision = 1)
+            if enable > 0:
+                logging.debug("Collision pair: %s %s", self.toggCollisionLinks[i][0], self.toggCollisionLinks[i][1])
         print()
         print()
     
@@ -151,7 +164,7 @@ class Oreo_Robot(object):
             self.useRealTime = False
             p.setRealTimeSimulation(0)
             p.setTimeStep(self.TIME_STEP)
-            logging.debug("Setting step sim with timestep %d", self.TIME_STEP)
+            logging.debug("Setting step sim with timestep %f", self.TIME_STEP)
     
     # Reset actuated joint control
     def ResetActJointControl(self) :
@@ -227,7 +240,7 @@ class Oreo_Robot(object):
                 self.manCtrl.append(p.addUserDebugParameter(name, self.prismaticLim[self.LIM_MIN_IDX], self.prismaticLim[self.LIM_MAX_IDX]))
             else :
                 self.manCtrl.append(p.addUserDebugParameter(name, self.revoluteLim[self.LIM_MIN_IDX], self.revoluteLim[self.LIM_MAX_IDX]))
-        
+
     # Update manual control
     def UpdManCtrl(self) :
         pos = [0]*self.actJointNum
@@ -244,7 +257,8 @@ class Oreo_Robot(object):
         vis_data = p.getVisualShapeData(self.linkage)
         for i in range(self.numJoints):
             jointInfo = p.getJointInfo(self.linkage, i)
-            self.jointDict[jointInfo[1].decode('UTF-8')] = i        
+            self.jointDict[jointInfo[1].decode('UTF-8')] = i
+            p.enableJointForceTorqueSensor(self.linkage, i, enableSensor = True)
             state = p.getLinkState(self.linkage, jointInfo[0])
             coll_data = p.getCollisionShapeData(self.linkage, i)
             logging.debug("%s %d", jointInfo[1].decode('UTF-8'), i)
@@ -258,6 +272,7 @@ class Oreo_Robot(object):
         # Create list of actuated joints
         self.actJointIds = [self.jointDict[act_name] for act_name in self.actJointNames]
         self.actJointNum = len(self.actJointNames)
+        
         
         # Create list of spherical joints
         self.spherJointIds = [self.jointDict[spher_name] for spher_name in self.spherJointNames]
@@ -277,8 +292,8 @@ class Oreo_Robot(object):
         for i in range(self.numConstraints):
             parent_id = self.jointDict[self.constraintLinks[i][self.PARENT_IDX]]
             child_id = self.jointDict[self.constraintLinks[i][self.CHILD_IDX]]
-            self.constraintList.append(p.createConstraint(self.linkage, parent_id, self.linkage, child_id, self.constraintType, self.constraintAxis, self.constraintParentPos[i],  self.constraintChildPos))
-            p.changeConstraint(self.constraintList[i], maxForce = self.CONSTRAINT_MAX_FORCE)
+            self.constraintDict[self.constraintLinks[i][self.NAME_IDX]] =  p.createConstraint(self.linkage, parent_id, self.linkage, child_id, self.constraintType, self.constraintAxis, self.constraintParentPos[i],  self.constraintChildPos)
+            p.changeConstraint(self.constraintDict[self.constraintLinks[i][self.NAME_IDX]], maxForce = self.CONSTRAINT_MAX_FORCE)
 
         # Set joint control
         self.SetActJointControlType(self.POSITION_CONTROL)
@@ -296,18 +311,67 @@ class Oreo_Robot(object):
     def QueryCollision(self, linkA, linkB) :
         points = p.getContactPoints(bodyA = self.linkage, bodyB = self.linkage, linkIndexA = self.jointDict[linkA], linkIndexB = self.jointDict[linkB])
         if not points :
+            logging.debug("No collision points between %s & %s detected\n", linkA, linkB)
             return False
         else :
             logging.debug("Number of collision points between %s & %s detected: %d\n", linkA, linkB, len(points))
             return True
+        print()
+        print()
     
-    # Listen for keyboard event
-    def QueryKeyEvent(self, char) :
-        key = ord(char)
-        events = p.getKeyboardEvents()
-        if key in events and events[key]&p.KEY_WAS_TRIGGERED :
-            return True
-        return False
+    # Check all contact points
+    def QueryAllCollisions(self) :
+        points=p.getContactPoints()
+        logging.debug("Contact Points")
+        for temp in points :
+            logging.debug("a & b = %d & %d", temp[3], temp[4])
+        print()
+        print()
+    
+    # Print constraint state
+    def QueryConstraint(self) :
+        logging.debug("Constraint States")
+        for id in self.constraintDict :
+            logging.debug(p.getConstraintState(self.constraintDict[id]))
+        print()
+        print()
+    
+    # Print joint states
+    def QueryJointDynamics(self) :
+        logging.info("Joint States")
+        id_list = list(range(p.getNumJoints(self.linkage)))
+        ret = p.getJointStates(self.linkage, id_list)
+        idx = 0
+        for state in ret :
+            if(len(state) == 4) :
+                logging.debug("Id=%d velo=%s rxn=%s applied=%s", idx, str(state[1]), str(state[2]), str(state[3]))
+            elif(len(state) == 3) :
+                logging.debug("Id=%d velo=%s rxn=%s", idx, str(state[1]), str(state[2]))
+            else :
+                logging.error("Unexpected return list length %d", len(state))
+            idx += 1
+        print()
+        print()
+
+    # Get list of keys pressed
+    def GetKeyEvents(self) :
+        pressed = []
+        keyEvents = p.getKeyboardEvents()
+        for char in self.keys :
+            key = ord(char)
+            if key in keyEvents and keyEvents[key]&p.KEY_WAS_TRIGGERED :
+                pressed.append(char)
+        return pressed  
+
+    # Add key to listen
+    def RegKeyEvent(self, userIn) :
+        if isinstance(userIn, str) :
+            if userIn not in self.keys :
+                self.keys.append(userIn)
+        elif isinstance(userIn, list) :
+            for char in userIn :
+                if char not in self.keys :
+                    self.keys.append(char)
 
     # Cleanup stuff
     def Cleanup(self) :
@@ -316,4 +380,31 @@ class Oreo_Robot(object):
     # Reset robot
     def Reset(self) :
         p.resetSimulation()
-        self.InitModel() 
+        self.InitModel()
+
+    # Get joint and constraint dynamics
+    # returns [Fx,Fy,Fz,Mx,My,Mz]
+    def GetDynamics(self, name) :
+        # Determine if constraint or joint
+        state = []
+        if "joint" in name :
+            if self.jointDict[name] in self.actJointIds and self.actJointControl == p.TORQUE_CONTROL:
+                # use combination of reaction forces and applied motor torques
+                ret = p.getJointState(self.jointDict[name])
+                state = ret[2]
+            else :
+                # use combination of joint reaction forces and 
+                ret = p.getJointState(self.jointDict[name])
+                state = ret[2]
+        elif "constraint" in name :
+            state = p.getConstraintState(self.constraintDict[name]).tolist()
+            state.extend([0]*(self.DYN_STATE_SIZE-len(state)))
+        else: 
+            logging.error("Unknown name input to GetDynamics")
+        
+        return state
+    
+    # Get all joint and constraint dynamics
+
+        
+        
