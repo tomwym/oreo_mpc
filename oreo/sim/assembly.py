@@ -33,6 +33,7 @@ for i in range(numJoints):
     state = p.getLinkState(linkage, jointInfo[0])
     coll_data = p.getCollisionShapeData(linkage, jointInfo[0])
     logging.debug("%s %d", jointInfo[1].decode('UTF-8'), i)
+    logging.debug("links: %s %d", jointInfo[12], jointInfo[16])
     logging.debug("com frame (posn & orn) %s %s", str(state[0]), str(p.getEulerFromQuaternion(state[1])))
     logging.debug("inertial offset (posn & orn) %s %s", str(state[2]), str(p.getEulerFromQuaternion(state[3])))
     logging.debug("link frame (posn & orn) %s %s", str(state[4]), str(p.getEulerFromQuaternion(state[5])))
