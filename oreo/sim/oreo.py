@@ -2,6 +2,7 @@ import pybullet as p
 import time
 from scipy.spatial.transform import Rotation as R
 import logging
+import numpy as np
 
 class Oreo_Robot(object):
     # Class which controls the oreo robot
@@ -10,8 +11,18 @@ class Oreo_Robot(object):
     linkage = 0
     physicsClient = 0
     numJoints = 0
-    jointDict = {}
+    jointDict = {}                  # map joint name to id
+    linkJoints = []                 # map link id to all its joints/constraints
+    LINK_PARENT_IDX = 0             # joint ids where link is parent  
+    LINK_CHILD_IDX = 1              # joint ids where link is child 
+    initPosOrn = []
+    POS_IDX = 0
+    ORN_IDX = 1
     useRealTime = False
+    linkVelo = []
+    VELO_IDX = 0
+    ANG_VELO_IDX = 1
+
 
     numConstraints = 4
     constraintDict = {}
@@ -21,14 +32,15 @@ class Oreo_Robot(object):
                         ['right_eye_joint', 'dogbone_joint_mid_right', 'constraint_mid_right'],
                         ['right_eye_joint', 'dogbone_joint_far_right', 'constraint_far_right'], 
                       ]
-    PARENT_IDX = 0
-    CHILD_IDX = 1
-    NAME_IDX = 2
+    CONS_PARENT_IDX = 0
+    CONS_CHILD_IDX = 1
+    CONS_NAME_IDX = 2
     constraintParentPos = [[0.015, -0.0016, 0.0245], [0.0126, -0.0257, 0.0095], [0.0134, 0.0025, 0.0262], [0.0143, -0.0224, 0.0124]] # pos on eye
     constraintChildPos = [30.25e-3, 0, 0]   # pos on dogbone
     constraintAxis = [0,0,0]
     constraintType = p.JOINT_POINT2POINT
 
+    # Joints modelled with motor
     actJointNames = ["neck_joint", "pitch_piece_joint", "skull_joint", "linear_motor_rod_joint_far_left", "linear_motor_rod_joint_mid_left", \
                 "linear_motor_rod_joint_mid_right", "linear_motor_rod_joint_far_right"]
     actJointIds = []
@@ -42,6 +54,7 @@ class Oreo_Robot(object):
     manCtrl = []
     actJointControl = p.POSITION_CONTROL
 
+    # "Dumb" joints with no actuation
     dumbJointNames = ["left_eye_yolk_joint", "left_eye_joint", "right_eye_yolk_joint", "right_eye_joint"]
     dumbJointHome = 0
     dumbJointIds = 0
@@ -50,6 +63,7 @@ class Oreo_Robot(object):
     dumbJointControl = p.VELOCITY_CONTROL
     dumbJointForce = 0
 
+    # "Spherical" joints (no actuation)
     spherJointNames = ["dogbone_joint_far_left", "dogbone_joint_mid_left", "dogbone_joint_mid_right", "dogbone_joint_far_right"]
     spherJointHome = [[0, 0, 0.00427], [0, 0, 0.00427], [0, 0, 0.00427], [0, 0, -0.00427], [0, 0, -0.00427]]
     spherJointIds = []
@@ -61,6 +75,7 @@ class Oreo_Robot(object):
     spherJointKv = 1
     spherJointForce = [0,0,0]
 
+    # Links which have collisions disabled
     disCollisionLinks = [
         ['dogbone_joint_far_left', 'left_eye_joint'],
         ['dogbone_joint_mid_left', 'left_eye_joint'],
@@ -71,7 +86,8 @@ class Oreo_Robot(object):
         ['dogbone_joint_mid_right', 'right_eye_yolk_joint'],
         ['dogbone_joint_far_right', 'right_eye_yolk_joint'],
     ]
-
+    
+    # Links with collisions enabled
     toggCollisionLinks = [
         ['left_eye_joint', 'right_eye_joint'],
         ['left_eye_yolk_joint', 'right_eye_yolk_joint'],
@@ -83,6 +99,7 @@ class Oreo_Robot(object):
 
     ]
     
+    # Registered key events to look for
     keys = []
 
     # Constants
@@ -94,6 +111,7 @@ class Oreo_Robot(object):
     POSITION_CONTROL = 1
     TIME_STEP = 1/240
     DYN_STATE_SIZE = 6
+    GRAV_ACCELZ = -9.8
 
 
     # Constructor
@@ -130,7 +148,7 @@ class Oreo_Robot(object):
         # Update position list
         self.actJointPos = [self.actJointHome]*self.actJointNum
 
-        # Reset spherical joints        
+        # Reset spherical joints
         for spher_idx in range(self.spherJointNum) :
             p.resetJointStateMultiDof(self.linkage, self.spherJointIds[spher_idx], targetValue = self.spherJointHome[spher_idx])
 
@@ -177,11 +195,11 @@ class Oreo_Robot(object):
         self.ResetActJointControl()
         self.ControlActJoints([0]*self.actJointNum)
 
-    #Initialize robot for torque control
+    # Initialize robot for torque control
     def InitTorqueCtrl(self) :
         self.SetActJointControlType(self.TORQUE_CONTROL)
         self.ResetActJointControl()
-        self.ControlActJoints([0]*self.actJointNum)        
+        self.ControlActJoints([0]*self.actJointNum)  
 
     # Set actuated joint control type
     def SetActJointControlType(self, ctrl_type) :
@@ -256,23 +274,37 @@ class Oreo_Robot(object):
         logging.info("There are %d links in file\n", self.numJoints)
         vis_data = p.getVisualShapeData(self.linkage)
         for i in range(self.numJoints):
+            # map joint names to id (same mapping for links)
             jointInfo = p.getJointInfo(self.linkage, i)
             self.jointDict[jointInfo[1].decode('UTF-8')] = i
+
+            # record parent and child ids for each joint [child, parent]
+#            self.linkJoints.append([[jointInfo[16]], [i]])
+            # ignore the dummy link
+#            if(i > 0) :
+#                self.linkJoints[jointInfo[16]][self.LINK_PARENT_IDX].append(jointInfo[16])
+
+            # measure force/torque at the joints
             p.enableJointForceTorqueSensor(self.linkage, i, enableSensor = True)
+
+            # Store initial positions and orientations
             state = p.getLinkState(self.linkage, jointInfo[0])
+            self.initPosOrn.append([state[4], state[5]])
+
+            # debugging            
             coll_data = p.getCollisionShapeData(self.linkage, i)
             logging.debug("%s %d", jointInfo[1].decode('UTF-8'), i)
             logging.debug("com frame (posn (global) & orn (global)) %s %s", str(state[0]), str(p.getEulerFromQuaternion(state[1])))
             logging.debug("inertial offset (posn (link frame), orn (link frame)) %s %s", str(state[2]), str(p.getEulerFromQuaternion(state[3])))
             logging.debug("link frame (posn (global), orn (global)) %s %s", str(state[4]), str(p.getEulerFromQuaternion(state[5])))
             logging.debug("type %s", str(jointInfo[2]))
+            logging.debug("axis %s", str(jointInfo[13]))
             logging.debug("collision (posn (COM frame), orn(COM frame)) %s %s", str(coll_data[0][5]), str(p.getEulerFromQuaternion(coll_data[0][6])))
             logging.debug("visual (posn (link frame), orn(link frame)) %s %s\n\n", str(vis_data[i][5]), str(p.getEulerFromQuaternion(vis_data[i][6])))
     
         # Create list of actuated joints
         self.actJointIds = [self.jointDict[act_name] for act_name in self.actJointNames]
         self.actJointNum = len(self.actJointNames)
-        
         
         # Create list of spherical joints
         self.spherJointIds = [self.jointDict[spher_name] for spher_name in self.spherJointNames]
@@ -282,6 +314,9 @@ class Oreo_Robot(object):
         self.dumbJointIds = [self.jointDict[dumb_name] for dumb_name in self.dumbJointNames]
         self.dumbJointNum = len(self.dumbJointNames)
 
+        # Init struct
+        self.linkVelo = [[0,0,0],[0,0,0]]*p.getNumJoints(self.linkage)
+
         # Enable collision by default
         self.ToggleCollision(1)
 
@@ -290,10 +325,14 @@ class Oreo_Robot(object):
 
         # Constraints
         for i in range(self.numConstraints):
-            parent_id = self.jointDict[self.constraintLinks[i][self.PARENT_IDX]]
-            child_id = self.jointDict[self.constraintLinks[i][self.CHILD_IDX]]
-            self.constraintDict[self.constraintLinks[i][self.NAME_IDX]] =  p.createConstraint(self.linkage, parent_id, self.linkage, child_id, self.constraintType, self.constraintAxis, self.constraintParentPos[i],  self.constraintChildPos)
-            p.changeConstraint(self.constraintDict[self.constraintLinks[i][self.NAME_IDX]], maxForce = self.CONSTRAINT_MAX_FORCE)
+            parent_id = self.jointDict[self.constraintLinks[i][self.CONS_PARENT_IDX]]
+            child_id = self.jointDict[self.constraintLinks[i][self.CONS_CHILD_IDX]]
+            self.constraintDict[self.constraintLinks[i][self.CONS_NAME_IDX]] =  p.createConstraint(self.linkage, parent_id, self.linkage, child_id, self.constraintType, self.constraintAxis, self.constraintParentPos[i],  self.constraintChildPos)
+            p.changeConstraint(self.constraintDict[self.constraintLinks[i][self.CONS_NAME_IDX]], maxForce = self.CONSTRAINT_MAX_FORCE)
+
+#            # Add to linkJoint list (make constraints -ve ids)
+#            self.linkJoints[parent_id][self.LINK_PARENT_IDX].append(parent_id*-1)
+#            self.linkJoints[child_id][self.LINK_CHILD_IDX].append(child_id*-1)
 
         # Set joint control
         self.SetActJointControlType(self.POSITION_CONTROL)
@@ -302,13 +341,13 @@ class Oreo_Robot(object):
         self.ControlSpherJoints()
 
         # Gravity
-        p.setGravity(0,0,-9.8)
+        p.setGravity(0,0,self.GRAV_ACCELZ)
 
         # Simulation type
         self.SetSimType(self.useRealTime)
     
     # Check if links have collided
-    def QueryCollision(self, linkA, linkB) :
+    def CheckCollision(self, linkA, linkB) :
         points = p.getContactPoints(bodyA = self.linkage, bodyB = self.linkage, linkIndexA = self.jointDict[linkA], linkIndexB = self.jointDict[linkB])
         if not points :
             logging.debug("No collision points between %s & %s detected\n", linkA, linkB)
@@ -320,38 +359,13 @@ class Oreo_Robot(object):
         print()
     
     # Check all contact points
-    def QueryAllCollisions(self) :
+    def CheckAllCollisions(self) :
         points=p.getContactPoints()
         logging.debug("Contact Points")
         for temp in points :
             logging.debug("a & b = %d & %d", temp[3], temp[4])
         print()
-        print()
-    
-    # Print constraint state
-    def QueryConstraint(self) :
-        logging.debug("Constraint States")
-        for id in self.constraintDict :
-            logging.debug(p.getConstraintState(self.constraintDict[id]))
-        print()
-        print()
-    
-    # Print joint states
-    def QueryJointDynamics(self) :
-        logging.info("Joint States")
-        id_list = list(range(p.getNumJoints(self.linkage)))
-        ret = p.getJointStates(self.linkage, id_list)
-        idx = 0
-        for state in ret :
-            if(len(state) == 4) :
-                logging.debug("Id=%d velo=%s rxn=%s applied=%s", idx, str(state[1]), str(state[2]), str(state[3]))
-            elif(len(state) == 3) :
-                logging.debug("Id=%d velo=%s rxn=%s", idx, str(state[1]), str(state[2]))
-            else :
-                logging.error("Unexpected return list length %d", len(state))
-            idx += 1
-        print()
-        print()
+        print()        
 
     # Get list of keys pressed
     def GetKeyEvents(self) :
@@ -381,30 +395,220 @@ class Oreo_Robot(object):
     def Reset(self) :
         p.resetSimulation()
         self.InitModel()
-
-    # Get joint and constraint dynamics
-    # returns [Fx,Fy,Fz,Mx,My,Mz]
-    def GetDynamics(self, name) :
-        # Determine if constraint or joint
-        state = []
-        if "joint" in name :
-            if self.jointDict[name] in self.actJointIds and self.actJointControl == p.TORQUE_CONTROL:
-                # use combination of reaction forces and applied motor torques
-                ret = p.getJointState(self.jointDict[name])
-                state = ret[2]
-            else :
-                # use combination of joint reaction forces and 
-                ret = p.getJointState(self.jointDict[name])
-                state = ret[2]
-        elif "constraint" in name :
-            state = p.getConstraintState(self.constraintDict[name]).tolist()
-            state.extend([0]*(self.DYN_STATE_SIZE-len(state)))
-        else: 
-            logging.error("Unknown name input to GetDynamics")
-        
-        return state
     
-    # Get all joint and constraint dynamics
+    # Get list of joint names
+    def GetJointNames(self) :
+        return list(self.jointDict.keys())
+    
+    # Get list of link names
+    def GetLinkNames(self) :
+        return [name.replace("joint", "link", 1) for name in self.jointDict.keys()]
 
+    # Print constraint reaction forces
+    def PrintConstraintDynamics(self) :
+        logging.debug("Constraint States")
+        for cons_id in self.constraintDict :
+            logging.debug(p.getConstraintState(self.constraintDict[cons_id]))
+        print()
+        print()
+    
+    # Update link velo
+    def UpdateAllLinkAccel(self) :
+        id_list = list(range(p.getNumJoints(self.linkage)))
+        ret = p.getLinkStates(self.linkage, id_list, computeLinkVelocity = 1)
+        idx = 0
+        for state in ret :
+            self.linkVelo[idx] = [list(state[6]), list(state[7])]
+            idx+=1
+
+    # Print link approx accel at last time step
+    def PrintLinkAccel(self) :
+        logging.info("Link Dynamics")
+        id_list = list(range(p.getNumJoints(self.linkage)))
+        ret = p.getLinkStates(self.linkage, id_list, computeLinkVelocity = 1)
+        idx = 0
+        for state in ret :
+            accel = list(self.linkVelo[idx][self.VELO_IDX])
+            ang_accel = list(self.linkVelo[idx][self.ANG_VELO_IDX])
+            for i in range(len(accel)) :
+                accel[i] = (state[6][i] - accel[i])/self.TIME_STEP
+                ang_accel[i] = (state[7][i] - ang_accel[i])/self.TIME_STEP
+            logging.debug("Id=%d accel=%s ang_accel=%s", idx, str(accel), str(ang_accel))
+            self.linkVelo[idx] = [list(state[6]), list(state[7])]
+            idx+=1
+        print()
+        print()   
+
+    # Compute approx accelerations of the link at last time step
+    def GetLinkAccel(self, name) :
+        # check if given link name (link == joint)
+        if "link" in name :
+            name.replace("link", "joint", 1)
+
+        # Check link exists
+        if name in self.jointDict :
+            ret = p.getLinkState(self.linkage, self.jointDict[name], computeLinkVelocity = 1)
+            accel = self.linkVelo[linkId][self.VELO_IDX]
+            ang_accel = self.linkVelo[linkId][self.ANG_VELO_IDX]
+            linkId = self.jointDict[name]
+            for i in range(len(accel)) :
+                accel = (accel[i] - ret[6][i]) / self.TIME_STEP
+                ang_accel = (ang_accel[i] - ret[7][i]) / self.TIME_STEP
+            self.linkVelo[linkId] = [ret[6], ret[7]]
+        else :
+            logging.error("Unknown name input to GetLinkAccel")
+            return []
+        
+        return [list(accel), list(ang_accel)]
+
+    # Get the position and orientation
+    def GetLinkPosOrn(self, name) :
+        # check if given link name (link == joint)
+        if "link" in name :
+            name.replace("link", "joint", 1)
+        idx = self.jointDict[name]
+        # Check link exists
+        if name in self.jointDict :
+            state = p.getLinkState(self.linkage, idx, computeForwardKinematics = True)
+            pos = list(np.array(state[4]) - np.array(self.initPosOrn[idx][self.POS_IDX]))
+            #orn = np.array(state[5]) - self.initPosOrn[idx][self.ORN_IDX]
+            orn = p.getDifferenceQuaternion(self.initPosOrn[idx][self.ORN_IDX], state[5])
+            logging.debug("%s pos=%s orn=%s", name, str(pos), str(p.getEulerFromQuaternion(orn)))
+        else :
+            logging.error("Unknown name input to GetLinkPosOrn")
+            return []
+        return [pos, orn]
         
         
+    
+#    # TODO
+#    # Find equivalent force-moment couple (through COM)
+#    def TranslateForce(self, force) :
+#        logging.debug("Force translations")
+    
+#    # Get contact forces
+#    #TODO
+#   def GetLinkContactForces(self, idx) :
+#        # Compute collision forces
+#        collisions = p.getContactPoints(bodyA = self.linkage, linkIndexA = idx)
+#        for info in collisions :
+#            orn = info[7]
+#            force = info[9]
+    
+#    # Get force/torque in world coordinates
+#    def CalcForceTorqueWorld(self, magn, idx) :
+#        info = p.getJointInfo(self.linkage, idx)
+#        #axis = info[]
+#
+#    # Sum all forces/moments on link at last time step
+#    # TODO
+#   def GetLinkTotalDynamics(self, name) :
+#        logging.debug("Getting total force")
+#        info = np.zeros(6)   # [Fx,Fy,Fz,Mx,My,Mz]
+
+#        # Check if given link name (link == joint)
+#        if "link" in name :
+#            name.replace("link", "joint", 1)
+        
+#        # Make sure valid
+#        if name not in self.jointDict :
+#            logging.error("Unknown name input to GetLinkTotalForceMom")
+#            return list(info)
+#        
+#        # Potential sources: joint/constraint rxn (when child & parent), contact, applied, gravity
+#        # Go through linkJoint list
+#        linkId = self.jointDict[name]
+#        joints = self.linkJoints[linkId] # holds joint ids involving this link
+#        
+#        # Joints where link is parent
+#        for num in range(len(joints)) :
+#            # Need to switch direction of rxn force for parent
+#            mult = 1
+#            if num == self.LINK_PARENT_IDX :
+#                mult = -1
+#            for i in joints[num] :
+#                if i >= 0:
+#                    # Reg joint
+#                    # Get applied/rxn force/torque
+#                    ret = []
+#                    if i in self.actJointIds :
+#                        # Rxn forces
+#                        ret = p.getJointState(self.linkage, i)
+#                       dynamics = np.add(dynamics, np.array(ret[2])*mult)
+#
+#                        # Applied force/torque
+#                        
+#                    else :
+#                        # Rxn force/torque
+#                        if i in self.spherJointIds :
+#                            ret = p.getJointStateMultiDof(self.linkage, i)
+#                            dynamics = np.add(dynamics, np.array(ret[2])*mult)
+#                        elif i in self.dumbJointIds :
+#                            ret = p.getJointState(self.linkage, i)
+#                            dynamics = np.add(dynamics, np.array(ret[2])*mult)
+#                        
+#                        # Applied force/torque
+#                        applied = ret[3]
+#                        
+#                else :
+#                    # Constraint
+#                    dynamics = np.add(dynamics, np.array(p.getConstraintState(i*-1))*-1)
+#        
+#        # Applied torques/forces from actuator
+#        if self.actJointControl == p.TORQUE_CONTROL and linkId in self.actJointIds :
+#            pass
+#        
+#        # Collisions
+#        dynamics += self.GetLinkContactForces(linkId)
+#        
+#        # Gravity
+#        dynamics[2] += self.GRAV_ACCELZ
+#        
+#        return dynamics
+#
+#    # Alternate form of link dynamics
+#    def GetLinkAccel2(self, name) :
+#        # check if given link name (link == joint)
+#        if "link" in name :
+#            name.replace("link", "joint", 1)
+#
+#        # check link exists
+#        if "name" in self.jointDict :
+#            # Get total forces/moments
+#            info = self.GetLinkTotalDynamics(name)
+#            # Mass and Inertial info
+#            
+#
+#    # Get joint and constraint dynamics
+#    # returns [Fx,Fy,Fz,Mx,My,Mz]
+#    # TODO: may need to rotate to match world frame orientation
+#    def GetJointDynamics(self, name) :
+#        # Determine if constraint or joint
+#        state = []
+#        if "joint" in name :
+#            ret = p.getJointState(self.jointDict[name])
+#            state = ret[2]
+#        elif "constraint" in name :
+#            state = p.getConstraintState(self.constraintDict[name]).tolist()
+#            state.extend([0]*(self.DYN_STATE_SIZE-len(state)))
+#        else: 
+#            logging.error("Unknown name input to GetJointDynamics")
+#        
+#        return state
+#    
+#    # Print joint states
+#    def PrintJointDynamics(self) :
+#        logging.info("Joint States")
+#        id_list = list(range(p.getNumJoints(self.linkage)))
+#        ret = p.getJointStates(self.linkage, id_list)
+#        idx = 0
+#        for state in ret :
+#            if(len(state) == 4) :
+#                logging.debug("Id=%d velo=%s rxn=%s applied=%s", idx, str(state[1]), str(state[2]), str(state[3]))
+#            elif(len(state) == 3) :
+#                logging.debug("Id=%d velo=%s rxn=%s", idx, str(state[1]), str(state[2]))
+#            else :
+#                logging.error("Unexpected return list length %d", len(state))
+#            idx += 1
+#        print()
+#        print()
