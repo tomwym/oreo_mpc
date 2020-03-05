@@ -1,6 +1,8 @@
 #ifndef CANSOCK_H
 #define CANSOCK_H
 
+#include <stdint.h>
+
 typedef struct {
 	uint32_t identifier;
 	uint8_t length;

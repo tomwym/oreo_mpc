@@ -369,34 +369,6 @@ void FormatSetPosRef(CAN_MSG* frame, uint8_t axis, uint8_t rel)
     frame->type = EXTENDED_FRAME;
 }
 
-// Function to set to relative position reference
-/*void FormatSetCPR(CAN_MSG* frame, uint8_t axis)
-{
-    uint16_t optCode = OPT_POSREF;
-    uint16_t idCode = AXIS_ID_CODE(axis);
-    frame->identifier = TML_CAN_ID(optCode, idCode);
-
-    for(int i = 0; i < sizeof(CPR_PAYLOAD); i++) {
-        frame->CAN_data[i] = (uint8_t)(CPR_PAYLOAD >> i);
-    }
-    frame->length = sizeof(CPR_PAYLOAD);
-    frame->type = EXTENDED_FRAME;
-}*/
-
-// Function to set to absolute position reference
-/*void FormatSetCPA(CAN_MSG* frame, uint8_t axis)
-{
-    uint16_t optCode = OPT_POSREF;
-    uint16_t idCode = AXIS_ID_CODE(axis);
-    frame->identifier = TML_CAN_ID(optCode, idCode);
-
-    for(int i = 0; i < sizeof(CPA_PAYLOAD); i++) {
-        frame->CAN_data[i] = (uint8_t)(CPA_PAYLOAD >> i);
-    }
-    frame->length = sizeof(CPA_PAYLOAD);
-    frame->type = EXTENDED_FRAME;
-}*/
-
 // Set the masterid for axis
 void FormatSetMasterId(CAN_MSG* frame, uint8_t axis, uint16_t newId)
 {

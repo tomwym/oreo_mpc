@@ -16,8 +16,8 @@
 
 // Configurable settings for the motor controllers
 #define HOST_ID                     88
-#define NECK_GROUP_ID		        1
-#define EYE_GROUP_ID		        2
+#define NECK_GROUP_ID		        1       // all motors part of group 1
+#define EYE_GROUP_ID		        1       // all motors part of group 1
 
 // Technosoft drive program specific addresses (Locations of specific motion profiles)
 #define MOTION_LOOP_IP		        0x4022u     
