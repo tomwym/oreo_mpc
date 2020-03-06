@@ -1,4 +1,4 @@
-#include "./include/TML_RS232_lib.h"
+#include "./include/TML_RS232_lib_2.h"
 #include "./include/TML_RS232_def.h"
 
 #include <stdio.h>
@@ -51,6 +51,33 @@ static uint16_t GetIdCode(motor_id_t* dest)
             idCode = 0;
     }
     return idCode;
+}
+
+static void FormatCommand(RS232_MSG* frame, motor_id_t* dest, uint16_t optCode, void* payload, uint8_t payloadWordSize)
+{
+    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
+    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
+
+    uint16_t idCode = GetIdCode(dest);
+    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
+    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
+
+    uint16_t* ptr = (uint16_t*)payload;
+    uint8_t idx = OFFSET_DATA_WORD1_HIGH;
+    for(uint8_t i = 0; i < payloadWordSize; i++) {
+        frame->RS232_data[idx+2*i] = HIBYTE(*(ptr+i));
+        frame->RS232_data[idx+2*i+1] = LOBYTE(*(ptr+i));
+    }
+
+    uint8_t len = sizeof(optCode) + sizeof(idCode) + payloadWordSize*sizeof(uint16_t);
+    frame->RS232_data[OFFSET_LENGTH] = len;
+
+    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
+    uint8_t csum_idx = OFFSET_DATA_WORD1_HIGH+2*payloadWordSize;
+    frame->RS232_data[csum_idx] = csum;
+
+    len += sizeof(len) + sizeof(csum);
+    frame->length = len;
 }
 
 // Set var which holds id recognized as host on the network
@@ -146,34 +173,14 @@ inline void FormatGiveMeData(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_ad
 {
     // Current only support reading from data memory
     uint16_t optCode = OPT_GIVE_ME_DATA | TM_DATA;
-    if(!is16bit)
-        optCode |= 0x1;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-    
-    // Id code
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
+    if(!is16bit) {
+        optCode |= 0x1u;
+    }       
 
     // Payload
-    uint16_t master_id = HOST_TO_MASTER(hostId);
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(master_id);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(master_id);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(reg_addr);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(reg_addr);
+    uint32_t payload = ADD_WORDS(reg_addr, HOST_TO_MASTER(hostId));
 
-    // Message length
-    uint8_t len = sizeof(idCode) + sizeof(optCode) + sizeof(master_id) + sizeof(reg_addr);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    // Checksum
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-    
-    // Total length
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
@@ -186,32 +193,11 @@ inline void FormatGiveMeData2(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_a
     if(!is16bit) {
         optCode |= 0x1u;
     }
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-    
-    // Id code
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
 
     // Payload
-    uint16_t masterId = HOST_TO_MASTER(hostId);
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(masterId);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(masterId);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(reg_addr);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(reg_addr);
+    uint32_t payload = ADD_WORDS(reg_addr, HOST_TO_MASTER(hostId));
 
-    // Len byte
-    uint8_t len = sizeof(idCode) + sizeof(masterId) + sizeof(reg_addr) + sizeof(optCode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    // Checksum
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    // Total length
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
@@ -220,32 +206,8 @@ inline void FormatGiveMeData2(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_a
 void FormatGoTo(RS232_MSG* frame, motor_id_t* dest, uint16_t addr)
 { 
     uint16_t optCode = OPT_GOTO_LABEL;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    // Id codes based on type
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    // Payload
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(addr);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(addr);
-
-    // Length
-    uint8_t len = sizeof(idCode) + sizeof(optCode) + sizeof(addr);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    // Checksum
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW+1] = csum;
-
-    // total length
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &addr, sizeof(addr)/2);
 }
-
-
 
 // Currently only supporting setting values for addresses in RAM
 // Function to format msg to modify 16 bit val in memory
@@ -256,24 +218,8 @@ void FormatSetVal16(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint1
         optCode = OPT_SET16_800;
     }
     optCode |= (LSB9_MASK & reg_addr);
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
 
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(val);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(val);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(val);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &val, sizeof(val)/2);
 }
 
 // Helper to transform float to fixed point representation
@@ -298,26 +244,8 @@ void FormatSetVal32(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint3
         optCode = OPT_SET32_800;
     }
     optCode |= (LSB9_MASK & reg_addr);
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
 
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)val);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)val);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE((uint16_t)(val >> 16));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE((uint16_t)(val >> 16));
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(val);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &val, sizeof(val)/2);
 
     return;
 }
@@ -326,24 +254,8 @@ void FormatSetVal32(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint3
 void FormatSTA(RS232_MSG* frame, motor_id_t* dest)
 {
     uint16_t optCode = OPT_STA;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(STA_PAYLOAD);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(STA_PAYLOAD);
-    
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(STA_PAYLOAD);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW+1] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    uint16_t payload = STA_PAYLOAD;
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
@@ -352,79 +264,27 @@ void FormatSTA(RS232_MSG* frame, motor_id_t* dest)
 void FormatSetAxisControl(RS232_MSG* frame, motor_id_t* dest, bool turnOn)
 {
     uint16_t optCode = (turnOn == true) ? OPT_AXISON : OPT_AXISOFF;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-    
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_OPTCODE_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, NULL, 0);
 }
 
 // Function to format set Target Update Mode 0 msg
 void FormatTUM(RS232_MSG* frame, motor_id_t* dest, uint8_t mode)
 {
     uint16_t optCode = OPT_TUM;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-    
     uint32_t payload;
     if(mode == 0)
         payload = TUM0_PAYLOAD;
     else
         payload = TUM1_PAYLOAD;
     
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)payload);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)payload);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(payload >> 16);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(payload >> 16);
-
-    uint8_t len = sizeof(payload) + sizeof(idCode) + sizeof(optCode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;  
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Function to format msg to change motion mode
 void FormatSetMotionMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode)
 {
     uint16_t optCode = OPT_MODE;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)mode);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)mode);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(mode >> 16);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(mode >> 16);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(mode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &mode, sizeof(mode)/2);
 }
 
 // Wrapper function for MODEPP
@@ -450,33 +310,15 @@ void FormatSetModePP3(RS232_MSG* frame, motor_id_t* dest)
 // Set rel to 0 for absolute position reference
 void FormatSetPosRef(RS232_MSG* frame, motor_id_t* dest, uint8_t rel)
 {
-    uint16_t optCode = OPT_POSREF;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-    
+    uint16_t optCode = OPT_POSREF;    
     uint32_t payload;
-    if(rel > 0)
+    if(rel > 0) {
         payload = CPR_PAYLOAD;
-    else    
+    }
+    else {
         payload = CPA_PAYLOAD;
-    
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)payload);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)payload);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(payload >> 16);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(payload >> 16);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(payload);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len+sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    }    
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Wrapper for setting relative position reference
@@ -503,29 +345,11 @@ void FormatPing(RS232_MSG* frame, motor_id_t* dest)
 {
     // Broadcast ping message
     uint16_t optCode = OPT_PING;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
     uint16_t masterId = HOST_TO_MASTER(hostId);
     // Scale latency based on baudrate
     uint16_t latency = PING_LATENCY_115200 * (BAUDRATE_115200 - baudRate)*2;
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(masterId);
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = LOBYTE(masterId);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE(latency);
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE(latency);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(masterId) + sizeof(latency);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    uint32_t payload = ADD_WORDS(latency, masterId);
+    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Get relevant data from pong message
@@ -554,21 +378,7 @@ int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE])
 void FormatUpdatePosn(RS232_MSG* frame, motor_id_t* dest)
 {
     uint16_t optCode = OPT_UPD;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
-    frame->RS232_data[OFFSET_OPTCODE_LOW+1] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, NULL, 0);
 }
 
 // Enable control-loop sync messages on axes
@@ -577,78 +387,24 @@ void FormatUpdatePosn(RS232_MSG* frame, motor_id_t* dest)
 void FormatSetSync(RS232_MSG* frame, motor_id_t* dest)
 {
     uint16_t optCode = OPT_SETSYNC;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
     uint32_t period = SYNC_MSG_PERIOD;
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)period);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)period);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE((uint16_t)(period >> 16));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE((uint16_t)(period >> 16));
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(period);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW+1] = csum;
-
-    len += sizeof(csum) + sizeof(len);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &period, sizeof(period)/2);
 }
 
 // Set serial baud rate
 void FormatSetBaudRate(RS232_MSG* frame, serial_baudrate_t rate)
 {
     uint16_t optCode = OPT_SCIBR;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = BROADCAST_ID_CODE;
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-
     baudRate = rate;
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE(baudRate);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE(baudRate);
-
-    uint8_t len = sizeof(optCode) + sizeof(idCode) + sizeof(baudRate);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW+1] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
+    FormatCommand(frame, &dest, optCode, &rate, sizeof(baudRate)/2);
 }
 
 // Set external reference mode
 void SetExtRefMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode)
 {
     uint16_t optCode = OPT_EXTREF;
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
-
-    uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
-    
-    frame->RS232_data[OFFSET_DATA_WORD1_HIGH] = HIBYTE((uint16_t)mode);
-    frame->RS232_data[OFFSET_DATA_WORD1_LOW] = LOBYTE((uint16_t)mode);
-    frame->RS232_data[OFFSET_DATA_WORD2_HIGH] = HIBYTE((uint16_t)(mode >> 16));
-    frame->RS232_data[OFFSET_DATA_WORD2_LOW] = LOBYTE((uint16_t)(mode >> 16));
-
-    uint8_t len = sizeof(idCode) + sizeof(optCode) + sizeof(mode);
-    frame->RS232_data[OFFSET_LENGTH] = len;
-
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
-    frame->RS232_data[OFFSET_CHECKSUM] = csum;
-
-    len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    FormatCommand(frame, dest, optCode, &mode, sizeof(mode)/2);
 }
 
 // Set external reference mode to online (send messages from host)
