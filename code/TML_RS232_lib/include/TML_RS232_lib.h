@@ -22,12 +22,14 @@
 
 
 // Common instruction pointer addresses
-#define MOTION_LOOP_IP		0x4022u     // Motion(eye) loop
-#define WAIT_LOOP_IP		0x401Bu     // Wait(eye) loop
-#define MOTION_LOOP_NECK_IP	0x403Bu     // Motion(neck) loop
-#define WAIT_LOOP_NECK_IP	0x4034u     // Wait(neck) loop
-#define REV_CAL_IP		    0x4061u     // Reverse calibration
-#define FOR_CAL_IP		    0x4027u     // Forward calibration
+#define POSN_LOOP_EYE_IP		0x4025u     // Motion(eye) loop
+#define WAIT_LOOP_EYE_IP		0x401Eu     // Wait(eye) loop
+#define FORCE_LOOP_EYE_IP       0x402Au     // Torque control loop
+#define POSN_LOOP_NECK_IP	    0x403Bu     // Motion(neck) loop
+#define WAIT_LOOP_NECK_IP	    0x4034u     // Wait(neck) loop
+#define TORQUE_LOOP_NECK_IP     0xFFFFu     // Torque control loop
+#define REV_CAL_EYE_IP          0x4069u     // Reverse calibration
+#define FOR_CAL_EYE_IP	        0x402Fu     // Forward calibration
 
 // type of id
 typedef enum {
@@ -60,6 +62,12 @@ typedef enum {
     EXTREF_DIGITAL,
 } ext_ref_t;
 
+// enum to specify which device to write to
+typedef enum {
+    DEV_EYE,
+    DEV_NECK,
+} dest_dev_t;
+
 // Holds the id recognized as host on the network
 void InitLib(uint8_t id, serial_baudrate_t rate);
 
@@ -67,13 +75,16 @@ void InitLib(uint8_t id, serial_baudrate_t rate);
 int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* reg_addr);
 
 // Function to format msg requesting data from specific axis
-void FormatGiveMeData(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, bool is16bit);//__attribute__((always_inline));
+void SendGiveMeData(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, bool is16bit);//__attribute__((always_inline));
 
 // Function to format msg requesting data from axis group
-void FormatGiveMeData2(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, bool is16bit);//__attribute__((always_inline));
+void SendGiveMeData2(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, bool is16bit);//__attribute__((always_inline));
+
+// Function to format msg to GOTO certain place in TML prog
+void SendGoTo(dest_dev_t dev, motor_id_t* dest, uint16_t addr);//__attribute__((always_inline));
 
 // Function to format msg to modify 16 bit val in memory
-void FormatSetVal16(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint16_t val);//__attribute__((always_inline));
+void SetVal16(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, uint16_t val);//__attribute__((always_inline));
 
 // Helper to transform float to fixed point representation
 uint32_t DoubleToFixed(double num);
@@ -82,75 +93,69 @@ uint32_t DoubleToFixed(double num);
 double FixedToDouble(uint32_t num);
 
 // Function to format msg to modify 16 bit val in memory
-void FormatSetVal32(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint32_t val);//__attribute__((always_inline));
-
-// Function to format msg to GOTO certain place in TML prog
-void FormatGoTo(RS232_MSG* frame, motor_id_t* dest, uint16_t addr);//__attribute__((always_inline));
+void SetVal32(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, uint32_t val);//__attribute__((always_inline));
 
 // Function to format set target posn = actual posn 
-void FormatSTA(RS232_MSG* frame, motor_id_t* dest);//__attribute__((always_inline));
+void SendSTA(dest_dev_t dev, motor_id_t* dest);//__attribute__((always_inline));
 
 // Function to set control of Axis (on or off)
-void FormatSetAxisControl(RS232_MSG* frame, motor_id_t* dest, bool turnOn);//__attribute__((always_inline));
+void SetAxisControl(dest_dev_t dev, motor_id_t* dest, bool turnOn);//__attribute__((always_inline));
 
 // Function to format set Target Update Mode msg
-void FormatTUM(RS232_MSG* frame, motor_id_t* dest, uint8_t mode);//__attribute__((always_inline));
-
-// Function to format msg to change motion mode
-void FormatSetMotionMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode);
+void SetTUM(dest_dev_t dev, motor_id_t* dest, uint8_t mode);//__attribute__((always_inline));
 
 // Wrapper function for MODEPP -- same as MODEPP1 on older firmware
-void FormatSetModePP(RS232_MSG* frame, motor_id_t* dest);//__attribute__((always_inline));
+void SetModePP(dest_dev_t dev, motor_id_t* dest);//__attribute__((always_inline));
 
 // Function to format MODEPP1 -- obsolete in new firmware
-void FormatSetModePP1(RS232_MSG* frame, motor_id_t* dest);//__attribute__((always_inline));
+void SetModePP1(dest_dev_t dev, motor_id_t* dest);//__attribute__((always_inline));
 
 // Function to format MODEPP3 -- obsolete in new firmware
-void FormatSetModePP3(RS232_MSG* frame, motor_id_t* dest);//__attribute__((always_inline));
+void SetModePP3(dest_dev_t dev, motor_id_t* dest);//__attribute__((always_inline));
 
-// Function to set position reference mode
-// Set rel to 1 for relative position reference
-// Set rel to 0 for absolute position reference
-void FormatSetPosRef(RS232_MSG* frame, motor_id_t* dest, uint8_t rel);//__attribute__((always_inline));
+// Wrapper function for MODE_TES -- torque slow loop
+void SetModeTorqueSlow(dest_dev_t dev, motor_id_t* dest);
+
+// Wrapper function for MODE_TEF -- torque fast loop
+void SetModeTorqueFast(dest_dev_t dev, motor_id_t* dest);
 
 // Wrapper for setting relative position reference
-void FormatSetCPR(RS232_MSG* frame, motor_id_t* dest);
+void SetCPR(dest_dev_t dev, motor_id_t* dest);
 
 // Wrapper for setting absolute position reference
-void FormatSetCPA(RS232_MSG* frame, motor_id_t* dest);
+void SetCPA(dest_dev_t dev, motor_id_t* dest);
 
 // Set Master Id
-void FormatSetMasterId(RS232_MSG* frame, motor_id_t* dest, uint16_t newId);//__attribute__((always_inline));
-
-// Set serial baud rate
-void FormatSetBaudRate(RS232_MSG* frame, serial_baudrate_t rate);
+void SetMasterId(dest_dev_t dev, motor_id_t* dest, uint16_t newId);//__attribute__((always_inline));
 
 // Broadcast ping message
-void FormatPing(RS232_MSG* frame, motor_id_t* dest);
+void SendPing(dest_dev_t dev, motor_id_t* dest);
 
 // Get relevant data from pong message
 // Returns false if not a pong message
-int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE]);
+int8_t ParsePong(dest_dev_t dev, uint8_t* axis, char version[VERSION_SIZE]);
 
 // Immediately update position with stored parameters
 // For broadcast message, set as group, id = 0
-void FormatUpdatePosn(RS232_MSG* frame, motor_id_t* dest);
+void UpdatePosn(dest_dev_t dev, motor_id_t* dest);
 
 // Enable control-loop sync messages on axes
 // Period sets time-between sync messages
 // Set period to 0 to disable sync
-void FormatSetSync(RS232_MSG* frame, motor_id_t* id);
+void SetSync(dest_dev_t dev, motor_id_t* id);
 
-// Set external reference mode to analog (use analog input)
-void SetExtRefAnalog(RS232_MSG* frame, motor_id_t* dest);
-
-// Set external reference mode to digital (use digital input)
-void SetExtRefDigital(RS232_MSG* frame, motor_id_t* dest);
-
-// Set external reference mode to online (send messages from host)
-void SetExtRefOnline(RS232_MSG* frame, motor_id_t* dest);
+// Set serial baud rate
+void SetBaudRate(dest_dev_t dev, serial_baudrate_t rate);
 
 // Set external reference mode
-void SetExtRefMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode);
+void SetExtRefMode(dest_dev_t dev, motor_id_t* dest, uint32_t mode);
 
+// Set external reference mode to online (send messages from host)
+void SetExtRefOnline(dest_dev_t dev, motor_id_t* dest);
+
+// Set external reference mode to analog (use analog input)
+void SetExtRefAnalog(dest_dev_t dev, motor_id_t* dest);
+
+// Set external reference mode to digital (use digital input)
+void SetExtRefDigital(dest_dev_t dev, motor_id_t* dest);
 #endif

@@ -30,13 +30,12 @@ Purpose: To provide usage of socketCAN library provided by Linux
 #define DEFAULT_PORT                  (100000)
 
 // Create udp socket to tx/rx with the motor controller
-int InitSock(const char* localAddr, const char* remoteAddr, int timeoutMs)
+int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, uint16_t remotePort, int timeoutMs)
 {
     // Initialize
     int fd = -1;
     int sockErr;
     addr_t addrStruct;
-    
     
     // Make sure input is valid
     if(strlen(localAddr) == 0 || strlen(remoteAddr) == 0) {
@@ -47,7 +46,7 @@ int InitSock(const char* localAddr, const char* remoteAddr, int timeoutMs)
     // Only supporting ipv4 addresses
     if(inet_pton(AF_INET, localAddr, &(addrStruct.s4.sin_addr)) == 1) {
         addrStruct.s4.sin_family = AF_INET;
-        addrStruct.s4.sin_port = htons(DEFAULT_PORT);
+        addrStruct.s4.sin_port = htons(localPort);
     } else {
         return -1;
     }
@@ -77,10 +76,45 @@ int InitSock(const char* localAddr, const char* remoteAddr, int timeoutMs)
         addrStruct.s4.sin_family = AF_INET;
         addrStruct.s4.sin_port = htons(DEFAULT_PORT);
     } else {
+        printf("Failed to format remote address %s into IP address", remoteAddr);
         return -1;
     }
 
     // Connect to remote
+    // Connect() on a udp socket sets the default address to send messages to
+    if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in))) {
+        sockErr = errno;
+        printf("Failed to connect to remote address with err=%d\n", sockErr);
+        return -1;
+    }
+
+    return 0;
+}
+
+// Connect socket to new remote
+int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd)
+{
+    addr_t addrStruct;
+    int sockErr;
+
+    // Make sure input is valid
+    if(strlen(remoteAddr) == 0) {
+        printf("Invalid input addresses\n");
+        return -1;
+    }
+
+    // Only supporting ipv4 addresses
+    memset(&addrStruct, 0, sizeof(addrStruct));
+    if(inet_pton(AF_INET, remoteAddr, &(addrStruct.s4.sin_addr)) == 1) {
+        addrStruct.s4.sin_family = AF_INET;
+        addrStruct.s4.sin_port = htons(DEFAULT_PORT);
+    } else {
+        printf("Failed to format remote address %s into IP address", remoteAddr);
+        return -1;
+    }
+
+    // Connect to remote
+    // Connect() on a udp socket sets the default address to send messages to
     if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in))) {
         sockErr = errno;
         printf("Failed to connect to remote address with err=%d\n", sockErr);
@@ -91,7 +125,7 @@ int InitSock(const char* localAddr, const char* remoteAddr, int timeoutMs)
 }
 
 // Cleanup the socket
-void CleanSock(int fd)
+void CleanSock(int* fd)
 {
     // Check socket
     if(fd < 0) {
@@ -101,6 +135,7 @@ void CleanSock(int fd)
 
     // Close the socket and free struct
     close(fd);
+    *fd = -1;
 }
 
 // Send message
@@ -159,12 +194,15 @@ int ReceiveMessage(RS232_MSG * msg, int fd)
     }*/
 
     // Read message
-    int recvBytes = recv(fd, msg->RS232_data, msg->length, 0);
+    int recvBytes = recv(fd, msg->RS232_data, MAX_RS232_BYTES, 0);
     if(recvBytes < 0) {
         sockErr = errno;
         printf("Error on recv (err=%d)\n", sockErr);
         return -1;
     }
+    msg->length = recvBytes;
+
+    return 0;
 }
 
 // Empty the receive buffer

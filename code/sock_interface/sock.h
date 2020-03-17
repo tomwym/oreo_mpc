@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include <netinet/in.h>
 
-
+#define MAX_RS232_BYTES 15 // bytes
 typedef struct {
 	uint8_t length;
-	uint8_t RS232_data[15];
-}RS232_MSG;
+	uint8_t RS232_data[MAX_RS232_BYTES];
+} RS232_MSG;
 
 typedef union addr{
     struct sockaddr_storage ss;
@@ -19,19 +19,19 @@ typedef union addr{
 // Init Function
 // Returns file descriptor on success
 // Else returns -1
-int InitSock(addr_t* formatAddr, const char* address, int timeoutMs);
+int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, uint16_t remotePort, int timeoutMs);
 
-// Add filter to can socket
-void AddFilter(int fd, uint32_t id, uint32_t mask);
+// Connect socket to new remote
+int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd);
 
 // Clean up socket
-void CleanSock(int fd);
+void CleanSock(int* fd);
 
-// Send CAN Message
-int SendMessage(RS232_MSG * msg, int fd);
+// Send RS232 message
+int SendMessage(RS232_MSG* msg, int fd);
 
-// Receive CAN Message
-int ReceiveMessage(RS232_MSG * msg, int fd);
+// Receive RS232 message
+int ReceiveMessage(RS232_MSG* msg, int fd);
 
 // Empty the receive buffer
 void FlushCanSock(int fd);

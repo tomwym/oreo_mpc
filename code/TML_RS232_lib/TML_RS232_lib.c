@@ -1,5 +1,6 @@
-#include "./include/TML_RS232_lib_2.h"
+#include "./include/TML_RS232_lib.h"
 #include "./include/TML_RS232_def.h"
+#include "../libmacaque_RS232/macaque_linux.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,8 +54,21 @@ static uint16_t GetIdCode(motor_id_t* dest)
     return idCode;
 }
 
-static void FormatCommand(RS232_MSG* frame, motor_id_t* dest, uint16_t optCode, void* payload, uint8_t payloadWordSize)
+// Helper to build message
+static void FormatCommand(dest_dev_t dev, motor_id_t* dest, uint16_t optCode, void* payload, uint8_t payloadWordSize)
 {
+    RS232_MSG* frame;
+    if(dev == DEV_EYE) {
+        frame = GetMsgSlotEye();
+    } else {
+        frame = GetMsgSlotNeck();
+    }
+
+    if(frame == NULL) {
+        printf("Failed to add command to tx buffer\n");
+        return;
+    }
+
     frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
     frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
 
@@ -169,7 +183,7 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
 }
 
 // Ask specfic axis for data from memory
-inline void FormatGiveMeData(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, bool is16bit)
+inline void SendGiveMeData(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, bool is16bit)
 {
     // Current only support reading from data memory
     uint16_t optCode = OPT_GIVE_ME_DATA | TM_DATA;
@@ -180,13 +194,13 @@ inline void FormatGiveMeData(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_ad
     // Payload
     uint32_t payload = ADD_WORDS(reg_addr, HOST_TO_MASTER(hostId));
 
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
 
 // Function to format msg requesting data from axis group
-inline void FormatGiveMeData2(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, bool is16bit)
+inline void SendGiveMeData2(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, bool is16bit)
 {
     // Only can read from data memory
     uint16_t optCode = OPT_GIVE_ME_DATA2 | TM_DATA;
@@ -197,21 +211,21 @@ inline void FormatGiveMeData2(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_a
     // Payload
     uint32_t payload = ADD_WORDS(reg_addr, HOST_TO_MASTER(hostId));
 
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
 
 // GOTO message to certain place in TML program
-void FormatGoTo(RS232_MSG* frame, motor_id_t* dest, uint16_t addr)
+void SendGoTo(dest_dev_t dev, motor_id_t* dest, uint16_t addr)
 { 
     uint16_t optCode = OPT_GOTO_LABEL;
-    FormatCommand(frame, dest, optCode, &addr, sizeof(addr)/2);
+    FormatCommand(dev, dest, optCode, &addr, sizeof(addr)/2);
 }
 
 // Currently only supporting setting values for addresses in RAM
 // Function to format msg to modify 16 bit val in memory
-void FormatSetVal16(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint16_t val)
+void SetVal16(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, uint16_t val)
 {
     uint16_t optCode = OPT_SET16_200;
     if(reg_addr >= SET16_ADDR_LIMIT) {
@@ -219,7 +233,7 @@ void FormatSetVal16(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint1
     }
     optCode |= (LSB9_MASK & reg_addr);
 
-    FormatCommand(frame, dest, optCode, &val, sizeof(val)/2);
+    FormatCommand(dev, dest, optCode, &val, sizeof(val)/2);
 }
 
 // Helper to transform float to fixed point representation
@@ -236,7 +250,7 @@ double FixedToDouble(uint32_t num)
 
 // Currently only supporting setting values for addresses in RAM
 // Function to format msg to modify 32 bit val in memory
-void FormatSetVal32(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint32_t val)
+void SetVal32(dest_dev_t dev, motor_id_t* dest, uint16_t reg_addr, uint32_t val)
 {
     // OptCode changes based on address
     uint16_t optCode = OPT_SET32_200;
@@ -245,30 +259,30 @@ void FormatSetVal32(RS232_MSG* frame, motor_id_t* dest, uint16_t reg_addr, uint3
     }
     optCode |= (LSB9_MASK & reg_addr);
 
-    FormatCommand(frame, dest, optCode, &val, sizeof(val)/2);
+    FormatCommand(dev, dest, optCode, &val, sizeof(val)/2);
 
     return;
 }
 
 // Function to format set target posn = actual posn 
-void FormatSTA(RS232_MSG* frame, motor_id_t* dest)
+void SendSTA(dest_dev_t dev, motor_id_t* dest)
 {
     uint16_t optCode = OPT_STA;
     uint16_t payload = STA_PAYLOAD;
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 
     return;
 }
 
 // Function to set control of axis (on or off)
-void FormatSetAxisControl(RS232_MSG* frame, motor_id_t* dest, bool turnOn)
+void SetAxisControl(dest_dev_t dev, motor_id_t* dest, bool turnOn)
 {
     uint16_t optCode = (turnOn == true) ? OPT_AXISON : OPT_AXISOFF;
-    FormatCommand(frame, dest, optCode, NULL, 0);
+    FormatCommand(dev, dest, optCode, NULL, 0);
 }
 
 // Function to format set Target Update Mode 0 msg
-void FormatTUM(RS232_MSG* frame, motor_id_t* dest, uint8_t mode)
+void SetTUM(dest_dev_t dev, motor_id_t* dest, uint8_t mode)
 {
     uint16_t optCode = OPT_TUM;
     uint32_t payload;
@@ -277,38 +291,50 @@ void FormatTUM(RS232_MSG* frame, motor_id_t* dest, uint8_t mode)
     else
         payload = TUM1_PAYLOAD;
     
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Function to format msg to change motion mode
-void FormatSetMotionMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode)
+static void SetMotionMode(dest_dev_t dev, motor_id_t* dest, uint32_t mode)
 {
     uint16_t optCode = OPT_MODE;
-    FormatCommand(frame, dest, optCode, &mode, sizeof(mode)/2);
+    FormatCommand(dev, dest, optCode, &mode, sizeof(mode)/2);
 }
 
 // Wrapper function for MODEPP
-void FormatSetModePP(RS232_MSG* frame, motor_id_t* dest)
+void FormatSetModePP(dest_dev_t dev, motor_id_t* dest)
 {
-    FormatSetMotionMode(frame, dest, MODE_PP_PAYLOAD);
+    SetMotionMode(dev, dest, MODE_PP_PAYLOAD);
 }
 
 // Wrapper function for MODEPP1 -- obsolete in new firmware
-void FormatSetModePP1(RS232_MSG* frame, motor_id_t* dest)
+void SetModePP1(dest_dev_t dev, motor_id_t* dest)
 {
-    FormatSetMotionMode(frame, dest, MODE_PP1_PAYLOAD);
+    SetMotionMode(dev, dest, MODE_PP1_PAYLOAD);
 }
 
 // Wrapper function for MODEPP3 -- obsolete in new firmware
-void FormatSetModePP3(RS232_MSG* frame, motor_id_t* dest)
+void SetModePP3(dest_dev_t dev, motor_id_t* dest)
 {
-    FormatSetMotionMode(frame, dest, MODE_PP3_PAYLOAD);
+    SetMotionMode(dev, dest, MODE_PP3_PAYLOAD);
+}
+
+// Wrapper function for MODE_TES -- torque slow loop
+void SetModeTorqueSlow(dest_dev_t dev, motor_id_t* dest)
+{
+    SetMotionMode(dev, dest, MODE_TES);
+}
+
+// Wrapper function for MODE_TEF -- torque fast loop
+void SetModeTorqueFast(dest_dev_t dev, motor_id_t* dest)
+{
+    SetMotionMode(dev, dest, MODE_TEF);
 }
 
 // Function to set position reference mode
 // Set rel to 1 for relative position reference
 // Set rel to 0 for absolute position reference
-void FormatSetPosRef(RS232_MSG* frame, motor_id_t* dest, uint8_t rel)
+static void SetPosRef(dest_dev_t dev, motor_id_t* dest, uint8_t rel)
 {
     uint16_t optCode = OPT_POSREF;    
     uint32_t payload;
@@ -318,30 +344,30 @@ void FormatSetPosRef(RS232_MSG* frame, motor_id_t* dest, uint8_t rel)
     else {
         payload = CPA_PAYLOAD;
     }    
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Wrapper for setting relative position reference
-void FormatSetCPR(RS232_MSG* frame, motor_id_t* dest) 
+void SetCPR(dest_dev_t dev, motor_id_t* dest) 
 {
-    FormatSetPosRef(frame, dest, 1);
+    SetPosRef(dev, dest, 1);
 }
 
 // Wrapper for setting absolute position reference
-void FormatSetCPA(RS232_MSG* frame, motor_id_t* dest) 
+void SetCPA(dest_dev_t dev, motor_id_t* dest) 
 {
-    FormatSetPosRef(frame, dest, 0);
+    SetPosRef(dev, dest, 0);
 }
 
 // Set the masterid for axis
-void FormatSetMasterId(RS232_MSG* frame, motor_id_t* dest, uint16_t newId)
+void SetMasterId(dest_dev_t dev, motor_id_t* dest, uint16_t newId)
 {
     hostId = newId;
-    FormatSetVal16(frame, dest, REG_MASTERID, hostId);
+    SetVal16(dev, dest, REG_MASTERID, hostId);
 }
 
 // Format message to request all axis ids from the controllers
-void FormatPing(RS232_MSG* frame, motor_id_t* dest)
+void SendPing(dest_dev_t dev, motor_id_t* dest)
 {
     // Broadcast ping message
     uint16_t optCode = OPT_PING;
@@ -349,13 +375,24 @@ void FormatPing(RS232_MSG* frame, motor_id_t* dest)
     // Scale latency based on baudrate
     uint16_t latency = PING_LATENCY_115200 * (BAUDRATE_115200 - baudRate)*2;
     uint32_t payload = ADD_WORDS(latency, masterId);
-    FormatCommand(frame, dest, optCode, &payload, sizeof(payload)/2);
+    FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 }
 
 // Get relevant data from pong message
 // Returns false if not a pong message
-int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE])
+int8_t ParsePong(dest_dev_t dev, uint8_t* axis, char version[VERSION_SIZE])
 {
+    RS232_MSG* frame;
+    if(dev == DEV_EYE) {
+        frame = GetMsgSlotEye();
+    } else {
+        frame = GetMsgSlotNeck();
+    }
+
+    if(frame == NULL) {
+        return;
+    }
+    
     uint16_t optCode = (frame->RS232_data[OFFSET_OPTCODE_HIGH] << 8) | (frame->RS232_data[OFFSET_OPTCODE_LOW]); 
     if(frame->RS232_data[OFFSET_OPTCODE_HIGH] != HIBYTE(OPT_PONG)) {
         printf("Recevied frame was not pong response\n");
@@ -375,52 +412,52 @@ int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE])
 
 // Immediately update position with stored parameters
 // For broadcast message, set as group, id = 0
-void FormatUpdatePosn(RS232_MSG* frame, motor_id_t* dest)
+void UpdatePosn(dest_dev_t dev, motor_id_t* dest)
 {
     uint16_t optCode = OPT_UPD;
-    FormatCommand(frame, dest, optCode, NULL, 0);
+    FormatCommand(dev, dest, optCode, NULL, 0);
 }
 
 // Enable control-loop sync messages on axes
 // Period sets time-between sync messages
 // Set period to 0 to disable sync
-void FormatSetSync(RS232_MSG* frame, motor_id_t* dest)
+void SetSync(dest_dev_t dev, motor_id_t* dest)
 {
     uint16_t optCode = OPT_SETSYNC;
     uint32_t period = SYNC_MSG_PERIOD;
-    FormatCommand(frame, dest, optCode, &period, sizeof(period)/2);
+    FormatCommand(dev, dest, optCode, &period, sizeof(period)/2);
 }
 
 // Set serial baud rate
-void FormatSetBaudRate(RS232_MSG* frame, serial_baudrate_t rate)
+void SetBaudRate(dest_dev_t dev, serial_baudrate_t rate)
 {
     uint16_t optCode = OPT_SCIBR;
     baudRate = rate;
     motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
-    FormatCommand(frame, &dest, optCode, &rate, sizeof(baudRate)/2);
+    FormatCommand(dev, &dest, optCode, &rate, sizeof(baudRate)/2);
 }
 
 // Set external reference mode
-void SetExtRefMode(RS232_MSG* frame, motor_id_t* dest, uint32_t mode)
+void SetExtRefMode(dest_dev_t dev, motor_id_t* dest, uint32_t mode)
 {
     uint16_t optCode = OPT_EXTREF;
-    FormatCommand(frame, dest, optCode, &mode, sizeof(mode)/2);
+    FormatCommand(dev, dest, optCode, &mode, sizeof(mode)/2);
 }
 
 // Set external reference mode to online (send messages from host)
-void SetExtRefOnline(RS232_MSG* frame, motor_id_t* dest)
+void SetExtRefOnline(dest_dev_t dev, motor_id_t* dest)
 {
-    SetExtRefMode(frame, dest, EXTREF_ONLINE_PAYLOAD);
+    SetExtRefMode(dev, dest, EXTREF_ONLINE_PAYLOAD);
 }
 
 // Set external reference mode to analog (use analog input)
-void SetExtRefAnalog(RS232_MSG* frame, motor_id_t* dest)
+void SetExtRefAnalog(dest_dev_t dev, motor_id_t* dest)
 {
-    SetExtRefMode(frame, dest, EXTREF_ANALOG_PAYLOAD);
+    SetExtRefMode(dev, dest, EXTREF_ANALOG_PAYLOAD);
 }
 
 // Set external reference mode to digital (use digital input)
-void SetExtRefDigital(RS232_MSG* frame, motor_id_t* dest)
+void SetExtRefDigital(dest_dev_t dev, motor_id_t* dest)
 {
-    SetExtRefMode(frame, dest, EXTREF_DIGITAL_PAYLOAD);
+    SetExtRefMode(dev, dest, EXTREF_DIGITAL_PAYLOAD);
 }
