@@ -57,41 +57,37 @@ static uint16_t GetIdCode(motor_id_t* dest)
 // Helper to build message
 static void FormatCommand(dest_dev_t dev, motor_id_t* dest, uint16_t optCode, void* payload, uint8_t payloadWordSize)
 {
-    RS232_MSG* frame;
-    if(dev == DEV_EYE) {
-        frame = GetMsgSlotEye();
-    } else {
-        frame = GetMsgSlotNeck();
-    }
+    RS232_MSG frame;
 
-    if(frame == NULL) {
-        printf("Failed to add command to tx buffer\n");
-        return;
-    }
-
-    frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
-    frame->RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
+    frame.RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);
+    frame.RS232_data[OFFSET_OPTCODE_LOW] = LOBYTE(optCode);
 
     uint16_t idCode = GetIdCode(dest);
-    frame->RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
-    frame->RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
+    frame.RS232_data[OFFSET_IDCODE_HIGH] = HIBYTE(idCode);
+    frame.RS232_data[OFFSET_IDCODE_LOW] = LOBYTE(idCode);
 
     uint16_t* ptr = (uint16_t*)payload;
     uint8_t idx = OFFSET_DATA_WORD1_HIGH;
     for(uint8_t i = 0; i < payloadWordSize; i++) {
-        frame->RS232_data[idx+2*i] = HIBYTE(*(ptr+i));
-        frame->RS232_data[idx+2*i+1] = LOBYTE(*(ptr+i));
+        frame.RS232_data[idx+2*i] = HIBYTE(*(ptr+i));
+        frame.RS232_data[idx+2*i+1] = LOBYTE(*(ptr+i));
     }
 
     uint8_t len = sizeof(optCode) + sizeof(idCode) + payloadWordSize*sizeof(uint16_t);
-    frame->RS232_data[OFFSET_LENGTH] = len;
+    frame.RS232_data[OFFSET_LENGTH] = len;
 
-    uint8_t csum = CalcChecksum(frame, len + sizeof(len));
+    uint8_t csum = CalcChecksum(&frame, len + sizeof(len));
     uint8_t csum_idx = OFFSET_DATA_WORD1_HIGH+2*payloadWordSize;
-    frame->RS232_data[csum_idx] = csum;
+    frame.RS232_data[csum_idx] = csum;
 
     len += sizeof(len) + sizeof(csum);
-    frame->length = len;
+    frame.length = len;
+
+    if(dev == DEV_EYE) {
+        AddCmdEye(&frame);
+    } else {
+        AddCmdNeck(&frame);
+    }
 }
 
 // Set var which holds id recognized as host on the network
@@ -118,9 +114,6 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
         printf("Message not destined for host (%x). Discarded\n", id);
         return -1;
     }
-
-    // Can check host bit to differentiate between Type B and Type C messages
-    //uint8_t isTypeC = (HOST_BIT(frameId) > 0) ? 1 : 0;
 
     // Sort based on type of message    
     // Take Data 1 message
@@ -380,22 +373,11 @@ void SendPing(dest_dev_t dev, motor_id_t* dest)
 
 // Get relevant data from pong message
 // Returns false if not a pong message
-int8_t ParsePong(dest_dev_t dev, uint8_t* axis, char version[VERSION_SIZE])
-{
-    RS232_MSG* frame;
-    if(dev == DEV_EYE) {
-        frame = GetMsgSlotEye();
-    } else {
-        frame = GetMsgSlotNeck();
-    }
-
-    if(frame == NULL) {
-        return;
-    }
-    
+int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE])
+{    
     uint16_t optCode = (frame->RS232_data[OFFSET_OPTCODE_HIGH] << 8) | (frame->RS232_data[OFFSET_OPTCODE_LOW]); 
     if(frame->RS232_data[OFFSET_OPTCODE_HIGH] != HIBYTE(OPT_PONG)) {
-        printf("Recevied frame was not pong response\n");
+        printf("Received frame was not pong response\n");
         return -1;
     }
     frame->RS232_data[OFFSET_OPTCODE_HIGH] = HIBYTE(optCode);

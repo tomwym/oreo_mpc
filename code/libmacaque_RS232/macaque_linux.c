@@ -1,10 +1,3 @@
-/*
-    TODO:
-    - Replace SwitchToThread with Linux-equivalent
-    - Figure out how byte ordering works
-    - Figure out what to do for debug window
-*/
-
 // _DEFAULT_SOURCE defined for ifreq struct
 #define _DEFAULT_SOURCE
 #include <stdint.h>
@@ -37,32 +30,35 @@
 #include <errno.h>
 #include <sys/resource.h>
 
-#define M_PI                        ((double)3.14159265358979323846)
+#ifndef M_PI
+    #define M_PI                        ((double)3.14159265358979323846)
+#endif
 #define COUNTS_PER_POLE	            ((double)2048)
 #define METERS_PER_POLE             ((double)0.018)
 #define IU_TO_M                     (METERS_PER_POLE/COUNTS_PER_POLE)
 #define M_TO_IU                     (COUNTS_PER_POLE/METERS_PER_POLE)
 #define COUNTS_PER_REV 	            ((double)5000)
 #define COUNTS_PER_REV_YAW 	        ((double)16*86)
-#define IU_TO_RAD                   (M_PI/(2*COUNTS_PER_REV))
-#define RAD_TO_IU                   (1/IU_TO_RAD)
-#define IU_TO_RAD_YAW               (M_PI/(2*COUNTS_PER_REV_YAW))
-#define RAD_TO_IU_YAW               (1/IU_TO_RAD_YAW)
-
 #define SAMPLE_PERIOD_EYE_S	        (0.0005)
 #define SAMPLE_PERIOD_NECK_S	    (0.001)
 
+#define IU_TO_RAD_YAW               (M_PI/(2*COUNTS_PER_REV_YAW))
+#define RAD_TO_IU_YAW               (1/IU_TO_RAD_YAW)
 #define MPSS_TO_ACCEL_IU		    (SAMPLE_PERIOD_EYE_S * SAMPLE_PERIOD_EYE_S * M_TO_IU)
 #define ACCEL_IU_TO_MPSS		    (1.0 / MPSS_TO_ACCEL_IU)
 #define MPS_TO_SPEED_IU		        (SAMPLE_PERIOD_EYE_S * M_TO_IU)
 #define SPEED_IU_TO_MPS		        (1.0 / MPS_TO_SPEED_IU)
 
+#define IU_TO_RAD                   (M_PI/(2*COUNTS_PER_REV))
+#define RAD_TO_IU                   (1/IU_TO_RAD)
 #define RADPSS_TO_ACCEL_IU		    (SAMPLE_PERIOD_NECK_S * SAMPLE_PERIOD_NECK_S * RAD_TO_IU)
 #define RADPSS_TO_ACCEL_IU_YAW	    (SAMPLE_PERIOD_NECK_S * SAMPLE_PERIOD_NECK_S * RAD_TO_IU_YAW)
 #define ACCEL_IU_TO_RADPSS		    (1.0 / RADPSS_TO_ACCEL_IU)
+#define ACCEL_IU_TO_RADPSS_YAW      (1.0 / RADPSS_TO_ACCEL_IU_YAW)
 #define RADPS_TO_SPEED_IU		    (SAMPLE_PERIOD_NECK_S * RAD_TO_IU)
 #define RADPS_TO_SPEED_IU_YAW       (SAMPLE_PERIOD_NECK_S * RAD_TO_IU_YAW)
 #define SPEED_IU_TO_RADPS		    (1.0 / RADPS_TO_SPEED_IU)
+#define SPEED_IU_TO_RADPS_YAW       (1.0 / RADPS_TO_SPEED_IU_YAW)
 
 #define PEAK_CURR_NECK              (0.75)  // amps
 #define AMPS_TO_CURR_IU_NECK        (65472.0/(2.0*PEAK_CURR_NECK))
@@ -94,8 +90,9 @@
 #define DBG_BUFF_SIZE               (255)
 #define SEM_NOTSHARED               (0)
 
+#ifdef DEBUG_RS232
 // convert RS232 to string
-static char* get_msg_str(RS232_MSG* frame, char* buff)
+static char* get_msg_str(msg_t* frame, char* buff)
 {
     snprintf(buff, DBG_BUFF_SIZE, "0x");
     char* ptr = buff+2;
@@ -108,7 +105,7 @@ static char* get_msg_str(RS232_MSG* frame, char* buff)
 }
 
 // Debug prints of RS232 messages
-static void print_msg(RS232_MSG* frame, bool recv)
+static void print_msg(msg_t* frame, bool recv)
 {
     if(recv) {
         printf("\n\nRS232 MSG RECEIVED\n");
@@ -120,26 +117,7 @@ static void print_msg(RS232_MSG* frame, bool recv)
     printf("frame: %s\n\n", get_msg_str(frame, frame_str));
     return;
 }
-
-double convert_iu_to_m(int32_t iu)
-{
-    return IU_TO_M * iu;
-}
-
-int32_t convert_m_to_iu(double m)
-{
-    return (int32_t)(M_TO_IU * m);
-}
-
-double convert_iu_to_rad(int32_t iu)
-{
-    return IU_TO_RAD * iu;
-}
-
-double convert_iu_to_rad_yaw(int32_t iu)
-{
-    return IU_TO_RAD_YAW * iu;
-}
+#endif
 
 typedef struct rawData
 {
@@ -175,8 +153,10 @@ typedef struct devHandle
 
     int         	    runFlag;
     pthread_t      	    txThreadHandle;
+    bool                txThreadValid;
     pthread_t      	    rxThreadHandle;
-    char        	    rx_buf[BUFLEN];
+    bool                rxThreadValid;
+    msg_t        	    rx_buf;
 
     uint32_t         	ack_pend;
 
@@ -195,13 +175,13 @@ typedef struct devHandle
 
 } devHandle_t;
 
-devHandle_t eye  = {.local_port = EYE_LOCAL_PORT, .dest_ip = EYE_IP,
+devHandle_t eye  = {.local_ip = LOCAL_IP, .local_port = EYE_LOCAL_PORT, .dest_ip = EYE_IP,
                     .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
 		            .host_id = HOST_ID, .callback = &eyeRxCallback, 
                     .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
                     .buf_mutex = PTHREAD_MUTEX_INITIALIZER};
 
-devHandle_t neck = {.local_port = NECK_LOCAL_PORT, .dest_ip = NECK_IP,
+devHandle_t neck = {.local_ip = LOCAL_IP, .local_port = NECK_LOCAL_PORT, .dest_ip = NECK_IP,
                     .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
 		            .host_id = HOST_ID, .callback = &neckRxCallback, 
                     .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
@@ -226,20 +206,17 @@ void neckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             switch (axis_id) {
                 case NECK_YAW_AXIS:
                     log_data_id = NECK_YAW_POS;
-                    converted_data = convert_iu_to_rad_yaw(data);
-                    //converted_data = IU_TO_RAD_YAW*data;
+                    converted_data = IU_TO_RAD_YAW*data;
                     neckData.yaw = converted_data;
                     break;
                 case NECK_PITCH_AXIS:
                     log_data_id = NECK_PITCH_POS;
-                    converted_data = convert_iu_to_rad(data);
-                    //converted_data = IU_TO_RAD*data;
+                    converted_data = IU_TO_RAD*data;
                     neckData.pitch = converted_data;
                     break;
                 case NECK_ROLL_AXIS:
                     log_data_id = NECK_ROLL_POS;
-                    converted_data = convert_iu_to_rad(data);
-                    //converted_data = IU_TO_RAD*data;
+                    converted_data = IU_TO_RAD*data;
                     neckData.roll = converted_data;
                     break;
                 default:
@@ -291,24 +268,21 @@ void eyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
     switch (reg_addr) {
         case REG_APOS & REG_MASK:
             log_data_id = EYE_HALL;
-            converted_data = convert_iu_to_m(data);
-            //converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*data;
             eyeCalData.time = time;
             eyeCalData.pos[axis_id-1] = converted_data;
             break;
 
         case REG_POSERR & REG_MASK:
             log_data_id = EYE_POSERR;
-            converted_data = convert_iu_to_m(data);
-            //converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*data;
             eyeCalData.time = time;
             eyeCalData.err[axis_id-1] = converted_data;
             break;
 
         case REG_TPOS & REG_MASK:
             log_data_id = EYE_TARGET;
-            converted_data = convert_iu_to_m(data);
-            //converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*data;
             eyeCalData.time = time;
             eyeCalData.tpos[axis_id-1] = converted_data;
             break;
@@ -316,8 +290,7 @@ void eyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
         case REG_APOS2 & REG_MASK:
             log_data_id = EYE_ENCODER;
             eyeData.time = time;
-            converted_data = convert_iu_to_rad(data);
-            //converted_data = IU_TO_RAD*data;
+            converted_data = IU_TO_RAD*data;
             switch (axis_id) {
                 case EYE_YAW_LEFT_AXIS:
                     eyeData.yaw[EYE_LEFT] = converted_data;
@@ -343,8 +316,7 @@ void eyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
 
 	    case VAR_CAL_APOS2_OFF & REG_MASK:
             eyeData.time = time;
-            converted_data = convert_iu_to_rad(data);
-            //converted_data = IU_TO_RAD*data;
+            converted_data = IU_TO_RAD*data;
             logData = false;
             switch (axis_id) {
                 case EYE_YAW_LEFT_AXIS:
@@ -382,9 +354,9 @@ void eyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
 
 static void parse_response_msg(devHandle_t* dev)
 {   
-    RS232_MSG *msg = dev->rx_buf;
+    msg_t *msg = &dev->rx_buf;
     uint32_t result = 0;
-    uint16_t axis;
+    uint8_t axis;
     uint16_t reg_addr;
 
     if(msg == NULL) {  
@@ -419,8 +391,6 @@ static double get_timestamp()
 void* ThreadRxFunc(void* input)
 {
     devHandle_t* dev = (devHandle_t*)input;
-    struct sockaddr_can source_addr;
-    int source_addr_len = sizeof(source_addr);
     int rx_bytes;
     struct sched_param param = {RX_THREAD_PRIORITY};
     int err = 0;
@@ -433,21 +403,21 @@ void* ThreadRxFunc(void* input)
     }
 
     while(dev->runFlag) {
-        memset(dev->rx_buf,0, BUFLEN);
-        rx_bytes = ReceiveMessage(dev->rx_buf, dev->fd);
+        memset(&dev->rx_buf, 0, BUFLEN);
+        rx_bytes = ReceiveMessage(&dev->rx_buf, dev->fd);
         if(rx_bytes < 0) {
             printf("Failed to properly rx message\n");
             break;
         } else {
             // Sort by msg type
-            if(rx_bytes == CONN_SYNC_BYTES && dev->rx_buf[CONN_SYNC_BYTES-1] == CONN_SYNC_RESP) {
+            if(rx_bytes == CONN_SYNC_BYTES && dev->rx_buf.RS232_data[CONN_SYNC_BYTES-1] == CONN_SYNC_RESP) {
                 // Receive sync msg response
                 pthread_mutex_lock(&dev->sync_mutex);
                 dev->ack_pend = 0;
                 pthread_cond_signal(&dev->sync_cond);
                 printf("Sync response recvd\n");
                 pthread_mutex_unlock(&dev->sync_mutex);
-            } else if(dev->rx_buf[0] == MSG_ACK) {
+            } else if(dev->rx_buf.RS232_data[0] == MSG_ACK) {
                 // Check if ack message has been received (empty message)
                 pthread_mutex_lock(&dev->sync_mutex);
                 if(dev->ack_pend > 0) {
@@ -468,7 +438,7 @@ void* ThreadRxFunc(void* input)
 // Assumes sync_mutex has been acquired
 static inline int SyncThreads(devHandle_t* dev)
 {
-    RS232_MSG msg;
+    msg_t msg;
     msg.length = CONN_SYNC_BYTES;
     memset(msg.RS232_data, CONN_SYNC_BYTE, msg.length);
     if(SendMessage(&msg, dev->fd) < 0) {
@@ -486,13 +456,11 @@ static inline int SyncThreads(devHandle_t* dev)
     pthread_mutex_unlock(&dev->sync_mutex);
 
     return 0;
-
 }
 
 void* ThreadTxFunc(void* input) 
 {
     devHandle_t* dev = (devHandle_t*)input;
-    unsigned int index;
     struct sched_param param = {TX_THREAD_PRIORITY};
     int err = 0;
     bool needSync = false;
@@ -511,31 +479,27 @@ void* ThreadTxFunc(void* input)
     }
 
     // Loop while dev is running or cmds in buffer
-    while(dev->runFlag || (dev->cmd_produce_idx - dev->cmd_consume_idx) != 0) {  
-        if((dev->cmd_produce_idx - dev->cmd_consume_idx) == 0) {
-            // Command buffer empty
-            //SwitchToThread();
-            usleep(TX_THREAD_SLEEP); // We will try sleeping it first
-            sched_yield();      // A little different than SwitchToThread
-        } else {  
-            // Send next cmd
-            index = dev->cmd_consume_idx % MAX_CMD_PEND;
-            if (SendMessage(&dev->cmd_buf[index], dev->fd) < 0) {
-                printf("Failed to send motor command\n");
+    while(dev->runFlag) {  
+        // Send next msg on buffer
+        sem_wait(&dev->buf_full);
+        pthread_mutex_lock(&dev->buf_mutex);
+        if (SendMessage(&dev->cmd_buf[dev->cmd_consume_idx], dev->fd) < 0) {
+            printf("Failed to send motor command\n");
+            break;
+        }
+        dev->cmd_consume_idx = (dev->cmd_consume_idx + 1) % MAX_CMD_PEND;
+        pthread_mutex_unlock(&dev->buf_mutex);
+        sem_post(&dev->buf_empty);
+
+        // Handle if comm is unsync
+        pthread_mutex_lock(&dev->sync_mutex);
+        dev->ack_pend++;
+        needSync = dev->ack_pend > MAX_ACK_PEND;
+        pthread_mutex_unlock(&dev->sync_mutex);
+        if(needSync) {
+            if(SyncThreads(dev) < 0) {
+                printf("Failed to resync threads\n");
                 break;
-            }
-            dev->cmd_consume_idx++;
-            pthread_mutex_lock(&dev->sync_mutex);
-            dev->ack_pend++;
-            needSync = dev->ack_pend > MAX_ACK_PEND;
-            pthread_mutex_unlock(&dev->sync_mutex);
-            if(needSync) {
-                // Comm link down
-                // Try to resync
-                if(SyncThreads(dev) < 0) {
-                    printf("Failed to resync threads\n");
-                    break;
-                }
             }
         }
     }
@@ -547,11 +511,11 @@ void* ThreadTxFunc(void* input)
 // Initialize the device
 static uint16_t ConnectDev(devHandle_t* dev)
 {
-    RS232_MSG msg;
+    msg_t msg;
 
     const uint8_t* conn_msg[NUM_CONN_MSG] = {CONN_MSG1, CONN_MSG2, CONN_MSG3, CONN_MSG4};
     const uint8_t conn_msg_size[NUM_CONN_MSG] = {sizeof(CONN_MSG1), sizeof(CONN_MSG2), sizeof(CONN_MSG3), sizeof(CONN_MSG4)};
-    const uint8_t* conn_resp[NUM_CONN_MSG] = {CONN_MSG1, CONN_MSG2, CONN_MSG3, CONN_MSG4};
+    const uint8_t conn_resp[NUM_CONN_MSG] = {CONN_RESP1, CONN_RESP2, CONN_RESP3, CONN_RESP4};
 
     for(uint8_t i = 0; i < NUM_CONN_MSG; i++) {
         msg.length = conn_msg_size[i];
@@ -563,13 +527,13 @@ static uint16_t ConnectDev(devHandle_t* dev)
         }
 
         // Initialize receive buffer
-        memset(dev->rx_buf, 0, BUFLEN);
-        if (ReceiveMessage(dev->rx_buf, dev->fd) < 0) {
+        memset(&dev->rx_buf, 0, BUFLEN);
+        if (ReceiveMessage(&dev->rx_buf, dev->fd) < 0) {
             printf("Could not receive conn resp %u\n", i);
             return CONN_ERR;
         }
 
-        if(dev->rx_buf[0] != conn_resp[i]) {
+        if(dev->rx_buf.RS232_data[0] != conn_resp[i]) {
             printf("Unexpected response to conn msg %u\n", i);
             return CONN_ERR;
         }
@@ -580,7 +544,7 @@ static uint16_t ConnectDev(devHandle_t* dev)
 
 static uint16_t DisconnectDev(devHandle_t* dev)
 {
-    RS232_MSG msg;
+    msg_t msg;
 
     if(ConnectSock(dev->dest_ip, CONN_PORT, dev->fd) < 0) {
         printf("Failed to connect to conn port for remote addr %s\n", dev->dest_ip);
@@ -598,13 +562,13 @@ static uint16_t DisconnectDev(devHandle_t* dev)
         return CONN_ERR;
     }
 
-    memset(dev->rx_buf,0, BUFLEN);
-    if (ReceiveMessage(dev->rx_buf, dev->fd)) {
+    memset(&dev->rx_buf, 0, BUFLEN);
+    if (ReceiveMessage(&dev->rx_buf, dev->fd)) {
         printf("Could not receive disconnect response\n");
         return CONN_ERR;
     }
 
-    if(dev->rx_buf[0] != DISCONN_RESP) {
+    if(dev->rx_buf.RS232_data[0] != DISCONN_RESP) {
         printf("Unexpected response to disconnect msg\n");
         return CONN_ERR;
     }
@@ -620,22 +584,22 @@ static void ShutdownDev(devHandle_t* dev)
     // Stop the processing threads
     dev->runFlag = 0;
 
-    if(dev->rxThreadHandle != NULL) {
+    if(dev->rxThreadValid) {
         pthread_cancel(dev->rxThreadHandle);
         if(pthread_join(dev->rxThreadHandle, NULL) != 0) {
             err = errno;
             printf("pthread_join for rx failed with errno=%d\n", err);
         }
-        dev->rxThreadHandle = NULL;
+        dev->rxThreadValid = false;
     }
 
-    if(dev->txThreadHandle != NULL) {
+    if(dev->txThreadValid) {
         pthread_cancel(dev->txThreadHandle);
         if(pthread_join(dev->txThreadHandle, NULL) != 0) {
             err = errno;
             printf("pthread_join for tx failed with errno=%d\n", err);
         }
-        dev->txThreadHandle = NULL;
+        dev->txThreadValid = true;
     }
 
     if(dev->fd > -1) {
@@ -678,56 +642,49 @@ static void StartDev(devHandle_t* dev)
         }
         // Initialize buffer synch structures
         sem_init(&dev->buf_empty, SEM_NOTSHARED, MAX_CMD_PEND);
-        sem_init(&dev->buf_full, SEM_NOTSHARED, 1);
+        sem_init(&dev->buf_full, SEM_NOTSHARED, 0);
         // If we can talk with the drive, start the processing threads
         dev->runFlag = 1;
         if(pthread_create(&dev->rxThreadHandle, NULL, ThreadRxFunc, dev) != 0) {
             printf("Failed to start dev rx thread\n");
             return;
         }
+        dev->rxThreadValid = true;
         if(pthread_create(&dev->txThreadHandle, NULL, ThreadTxFunc, dev)) {
             printf("Failed to start dev tx thread\n");
             return;
         }
+        dev->txThreadValid = true;
     } else {
         printf("Failed to connect to drive\n");
     }
 }
 
-// Return slot in the tx buffer
-static msg_t* GetMsgSlot(devHandle_t* dev)
+static void AddCmd(devHandle_t* dev, msg_t* cmd)
 {
-    double base_time = get_timestamp();
-    double cur_time;
-    while (dev->cmd_produce_idx - dev->cmd_consume_idx == MAX_CMD_PEND) {
-        cur_time = get_timestamp();
-
-        if(cur_time - base_time > SEND_TIMEOUT_S || dev->runFlag == 0) { 
-            printf("send message failed to get slot\n");
-            return NULL;
-        }
-
-        // buffer is full, yield
-        //SwitchToThread();
-        sched_yield();
+    struct timespec timeout = {.tv_sec = SEND_TIMEOUT_S, .tv_nsec = 0};
+    if(sem_timedwait(&dev->buf_empty, &timeout) < 0) {
+        printf("Failed to add msg to cmd buf\n");
+        return;
     }
-
-    msg_t* msg = &dev->cmd_buf[dev->cmd_produce_idx % MAX_CMD_PEND];
-    memset(msg, 0, sizeof(msg_t));
-    dev->cmd_produce_idx++;
-    return msg;
+    pthread_mutex_lock(&dev->buf_mutex);
+    
+    msg_t* slot = &dev->cmd_buf[dev->cmd_produce_idx];
+    memcpy(slot, cmd, sizeof(msg_t));
+    dev->cmd_produce_idx = (dev->cmd_produce_idx + 1) % MAX_CMD_PEND;
+    
+    pthread_mutex_unlock(&dev->buf_mutex);
+    sem_post(&dev->buf_full);
 }
 
-// Wrapper for eye dev
-msg_t* GetMsgSlotEye()
+void AddCmdEye(msg_t* cmd)
 {
-    return GetMsgSlot(&eye);
+    AddCmd(&eye, cmd);
 }
 
-// Wrapper for neck dev
-msg_t* GetMsgSlotNeck()
+void AddCmdNeck(msg_t* cmd)
 {
-    return GetMsgSlot(&neck);
+    AddCmd(&neck, cmd);
 }
 
 // Start the library
@@ -803,10 +760,9 @@ void DisableNeckCtrl(void)
 #define MAX_FIXED_POINT 32767.999969
 #define MIN_FIXED_POINT -32767.999969
 
-static uint32_t getFixedPoint(double value)
+static uint32_t GetFixedPoint(double value)
 {
-    if(value >= MAX_FIXED_POINT  || value <= MIN_FIXED_POINT)
-    {
+    if(value >= MAX_FIXED_POINT  || value <= MIN_FIXED_POINT) {
         return 0;
     }
 
@@ -843,7 +799,7 @@ void SetEyePos(uint8_t axis, double pos_m)
 
 void SetEyeSpeed(uint8_t axis, double speed_mps)
 {
-    uint32_t data = getFixedPoint(speed_mps*MPS_TO_SPEED_IU);
+    uint32_t data = GetFixedPoint(speed_mps*MPS_TO_SPEED_IU);
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal32(DEV_EYE, &dest, REG_CSPD, data);
 }
@@ -876,9 +832,9 @@ void SetNeckPos(uint8_t axis, double pos_rad)
 {
     uint32_t data;
     if (axis == NECK_YAW_AXIS) {
-        data = getLong(pos_rad*RAD_TO_IU_YAW);
+        data = GetLong(pos_rad*RAD_TO_IU_YAW);
     } else {
-        data = getLong(pos_rad*RAD_TO_IU);
+        data = GetLong(pos_rad*RAD_TO_IU);
     }        
 
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
@@ -921,7 +877,6 @@ void StartEyeCal(uint8_t axis, double pos_m)
         return;
     }
 
-    uint32_t data;
     SetEyePos(axis, pos_m);
     eyeCalData.complete[axis-1] = CAL_RUNNING;
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = 1};

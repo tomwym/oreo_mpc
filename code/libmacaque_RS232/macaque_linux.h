@@ -2,17 +2,16 @@
 #define MACAQUE_LINUX_H
 
 #include <stdint.h>
-#include <sock.h>
+#include "../sock_interface/sock.h"
 
-#define SHUTDOWN_TIMEOUT_MS 	    2000
-#define RX_TIMEOUT_MS		        1000
-#define SEND_TIMEOUT_S		        1.0
-#define BUFLEN 			            32  	
-#define LOG_BUFLEN		            1024
-#define MAX_ACK_PEND 		        4  //limit how much we pound the drives with polls for data
-#define MAX_CMD_PEND 		        8  //must be a power of 2
+#define SHUTDOWN_TIMEOUT_MS 	    (2000)
+#define RX_TIMEOUT_MS		        (1000)
+#define SEND_TIMEOUT_S		        (1.0)
+#define BUFLEN 			            (32)  	
+#define LOG_BUFLEN		            (1024)
+#define MAX_ACK_PEND 		        (4)  //limit how much we pound the drives with polls for data
+#define MAX_CMD_PEND 		        (8)  //must be a power of 2
 
-#define CMD_PORT                    (uint16_t)(1700u)
 #define CONN_PORT		            (uint16_t)(30689u)
 #define CONN_MSG1		            ((uint8_t[]){0x01,0xA4,0x06})
 #define CONN_RESP1		            ((uint8_t)0x02)
@@ -23,11 +22,12 @@
 #define CONN_MSG4	                ((uint8_t[]){0x03,0x00,0xC2,0x01,0x00})//1Mbit config
 #define CONN_RESP4      	        ((uint8_t)0x04)
 #define NUM_CONN_MSG                (4)
-#define CONN_SYNC_RESP		        0x0Du
-#define CONN_SYNC_BYTES		        15
-#define CONN_SYNC_BYTE		        0xFFu
+#define CONN_SYNC_RESP		        (0x0Du)
+#define CONN_SYNC_BYTES		        (15)
+#define CONN_SYNC_BYTE		        (0xFFu)
 #define DISCONN_MSG		            ((uint8_t[]){0x05})
 #define DISCONN_RESP		        ((uint8_t)0x06)
+
 typedef enum {
     CONN_OK,
     CONN_ERR,
@@ -36,14 +36,13 @@ typedef enum {
 } conn_state_t;
 
 #define HOST_ID                     (120)
-
+#define LOCAL_IP                    ("192.168.2.8")
 #define NECK_LOCAL_PORT		        (51244u)
-#define NECK_IP			            ("192.168.2.15")
-
 #define EYE_LOCAL_PORT		        (51243u)
+#define NECK_IP			            ("192.168.2.15")
 #define EYE_IP			            ("192.168.2.14")
-
-#define COMM_PORT		            (1700)
+#define CMD_PORT                    (uint16_t)(1700u)
+#define COMM_PORT		            (uint16_t)(30689u)
 #define MSG_ACK			            ((uint8_t)0x4F)
 
 typedef RS232_MSG msg_t;
@@ -188,7 +187,7 @@ void Cleanup(void);
 
 
 // For RS232 module to write frames to buffer
-msg_t* GetMsgSlotEye();
-msg_t* GetMsgSlotNeck();
+void AddCmdEye(msg_t* cmd);
+void AddCmdNeck(msg_t* cmd);
 
 #endif 

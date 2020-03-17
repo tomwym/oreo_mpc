@@ -27,7 +27,6 @@ Purpose: To provide usage of socketCAN library provided by Linux
 #define MSEC_TO_USEC                  (1000)
 #define DEFAULT_TIMEOUT_SEC           (1)
 #define DEFAULT_TIMEOUT_USEC          (0)
-#define DEFAULT_PORT                  (100000)
 
 // Create udp socket to tx/rx with the motor controller
 int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, uint16_t remotePort, int timeoutMs)
@@ -52,7 +51,7 @@ int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, 
     }
 
     // Socket creation
-    int fd = socket(addrStruct.ss.ss_family, SOCK_DGRAM, 0);
+    fd = socket(addrStruct.ss.ss_family, SOCK_DGRAM, 0);
     if(fd < 0) {
         sockErr = errno;
         printf("Socket creation failed with err=%d\n", sockErr);
@@ -74,7 +73,7 @@ int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, 
     memset(&addrStruct, 0, sizeof(addrStruct));
     if(inet_pton(AF_INET, remoteAddr, &(addrStruct.s4.sin_addr)) == 1) {
         addrStruct.s4.sin_family = AF_INET;
-        addrStruct.s4.sin_port = htons(DEFAULT_PORT);
+        addrStruct.s4.sin_port = htons(remotePort);
     } else {
         printf("Failed to format remote address %s into IP address", remoteAddr);
         return -1;
@@ -107,7 +106,7 @@ int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd)
     memset(&addrStruct, 0, sizeof(addrStruct));
     if(inet_pton(AF_INET, remoteAddr, &(addrStruct.s4.sin_addr)) == 1) {
         addrStruct.s4.sin_family = AF_INET;
-        addrStruct.s4.sin_port = htons(DEFAULT_PORT);
+        addrStruct.s4.sin_port = htons(remotePort);
     } else {
         printf("Failed to format remote address %s into IP address", remoteAddr);
         return -1;
@@ -128,13 +127,13 @@ int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd)
 void CleanSock(int* fd)
 {
     // Check socket
-    if(fd < 0) {
+    if(*fd < 0) {
         printf("No socket to close\n");
         return;
     }
 
     // Close the socket and free struct
-    close(fd);
+    close(*fd);
     *fd = -1;
 }
 
