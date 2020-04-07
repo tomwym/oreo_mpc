@@ -80,15 +80,24 @@
 
 #define NANO_TO_SECS                (1000*1000*1000)
 #define CURRENT_TID                 (0)
-#define RX_THREAD_PRIORITY          (1)
-#define TX_THREAD_PRIORITY          (10)
+#define RX_THREAD_PRIORITY          (10)
+#define TX_THREAD_PRIORITY          (31)
 #define TX_THREAD_SLEEP             (100*1000) // us 
 
 #define CURRENT_PID                 (0)
-#define PROCESS_PRIORITY            (-20)  // -20 (highest) to 19 (lowest)
+#define PROCESS_PRIORITY            (-10)  // -20 (highest) to 19 (lowest)
 
 #define DBG_BUFF_SIZE               (255)
 #define SEM_NOTSHARED               (0)
+#define SYNC_TRIES                  (8)
+
+#define DEBUG_RS232
+#ifdef STARTUP_TEST
+#define DEBUG_STARTUP
+#endif
+//#define DEBUG_SYNC
+#define DEBUG_TX
+#define DEBUG_RX
 
 #ifdef DEBUG_RS232
 // convert RS232 to string
@@ -102,20 +111,6 @@ static char* get_msg_str(msg_t* frame, char* buff)
     }
 
     return buff;
-}
-
-// Debug prints of RS232 messages
-static void print_msg(msg_t* frame, bool recv)
-{
-    if(recv) {
-        printf("\n\nRS232 MSG RECEIVED\n");
-    } else {
-        printf("\n\nRS232 MSG SENT\n");
-    }
-
-    char frame_str[DBG_BUFF_SIZE];
-    printf("frame: %s\n\n", get_msg_str(frame, frame_str));
-    return;
 }
 #endif
 
@@ -150,6 +145,8 @@ typedef struct devHandle
     const char* const  	local_ip;
     const uint16_t     	local_port;
     const char* const  	dest_ip;
+    uint16_t            dest_conn_port;
+    uint16_t            dest_cmd_port;
 
     int         	    runFlag;
     pthread_t      	    txThreadHandle;
@@ -165,7 +162,6 @@ typedef struct devHandle
     uint32_t		    cmd_produce_idx;
     sem_t               buf_empty;
     sem_t               buf_full;
-    pthread_mutex_t     buf_mutex;
 
     uint8_t		        host_id;
 
@@ -175,17 +171,17 @@ typedef struct devHandle
 
 } devHandle_t;
 
-devHandle_t eye  = {.local_ip = LOCAL_IP, .local_port = EYE_LOCAL_PORT, .dest_ip = EYE_IP,
-                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
+static devHandle_t eye  = {.fd = -1, .local_ip = LOCAL_IP, .local_port = EYE_LOCAL_PORT, .dest_ip = EYE_IP,
+                    .dest_conn_port = CONN_PORT, .dest_cmd_port = CMD_PORT,
+                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0,
 		            .host_id = HOST_ID, .callback = &eyeRxCallback, 
-                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
-                    .buf_mutex = PTHREAD_MUTEX_INITIALIZER};
+                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER};
 
-devHandle_t neck = {.local_ip = LOCAL_IP, .local_port = NECK_LOCAL_PORT, .dest_ip = NECK_IP,
-                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0, 
+static devHandle_t neck = {.fd = -1, .local_ip = LOCAL_IP, .local_port = NECK_LOCAL_PORT, .dest_ip = NECK_IP,
+                    .dest_conn_port = CONN_PORT, .dest_cmd_port = CMD_PORT,
+                    .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0,
 		            .host_id = HOST_ID, .callback = &neckRxCallback, 
-                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
-                    .buf_mutex = PTHREAD_MUTEX_INITIALIZER};
+                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER};
 
 static void add_log_data(rawDataLog_t* log, double time, double data, uint8_t id)
 {
@@ -364,7 +360,8 @@ static void parse_response_msg(devHandle_t* dev)
     }
     
     #ifdef DEBUG_RS232
-        print_msg(msg, true);
+        char frame_str[DBG_BUFF_SIZE];
+        printf("recv [%u]: %s\n", dev->cmd_consume_idx, get_msg_str(msg, frame_str));
     #endif
 
     if(ParseResponse(msg, &result, &axis, &reg_addr)) {
@@ -395,7 +392,7 @@ void* ThreadRxFunc(void* input)
     struct sched_param param = {RX_THREAD_PRIORITY};
     int err = 0;
 
-    if(sched_setscheduler(CURRENT_TID, SCHED_RR, &param)) {
+    if(sched_setscheduler(CURRENT_TID, SCHED_RR, &param) != 0) {
         err = errno;
         printf("Failed to set RX Thread priority with error %d\n", err);
         printf("Exiting rx thread for ip=%s\n", dev->dest_ip);
@@ -403,22 +400,27 @@ void* ThreadRxFunc(void* input)
     }
 
     while(dev->runFlag) {
-        memset(&dev->rx_buf, 0, BUFLEN);
+        memset(&dev->rx_buf, 0, sizeof(msg_t));
         rx_bytes = ReceiveMessage(&dev->rx_buf, dev->fd);
         if(rx_bytes < 0) {
             printf("Failed to properly rx message\n");
             break;
-        } else {
+        } else if (rx_bytes > 0) {
             // Sort by msg type
             if(rx_bytes == CONN_SYNC_BYTES && dev->rx_buf.RS232_data[CONN_SYNC_BYTES-1] == CONN_SYNC_RESP) {
                 // Receive sync msg response
                 pthread_mutex_lock(&dev->sync_mutex);
                 dev->ack_pend = 0;
                 pthread_cond_signal(&dev->sync_cond);
+#ifdef DEBUG_SYNC
                 printf("Sync response recvd\n");
+#endif
                 pthread_mutex_unlock(&dev->sync_mutex);
             } else if(dev->rx_buf.RS232_data[0] == MSG_ACK) {
                 // Check if ack message has been received (empty message)
+#ifdef DEBUG_RX
+                printf("Msg ack recvd\n");
+#endif
                 pthread_mutex_lock(&dev->sync_mutex);
                 if(dev->ack_pend > 0) {
                     dev->ack_pend--;
@@ -436,8 +438,11 @@ void* ThreadRxFunc(void* input)
 }
 
 // Assumes sync_mutex has been acquired
-static inline int SyncThreads(devHandle_t* dev)
+static int8_t SyncThreads(devHandle_t* dev)
 {
+#ifdef DEBUG_SYNC
+    printf("Sending sync msg....");
+#endif
     msg_t msg;
     msg.length = CONN_SYNC_BYTES;
     memset(msg.RS232_data, CONN_SYNC_BYTE, msg.length);
@@ -445,33 +450,47 @@ static inline int SyncThreads(devHandle_t* dev)
         printf("Failed to send sync msg\n");
         return -1;
     }
+#ifdef DEBUG_SYNC
+    printf("sent\n");
+#endif
 
     // Wait for rx thread to get the response
+#ifdef DEBUG_SYNC
+    printf("Waiting for sync response....");
+#endif
     pthread_mutex_lock(&dev->sync_mutex);
-    while(dev->ack_pend != 0) {
+    uint8_t tries = 0;
+    while(dev->ack_pend != 0 && tries < SYNC_TRIES) {
         pthread_cond_wait(&dev->sync_cond, &dev->sync_mutex);
+#ifdef DEBUG_SYNC
         printf("SyncThreads signal received (ack_pend=%u)\n", dev->ack_pend);
-        dev->ack_pend--; // decrement so not stuck forever
+        tries++;
+#endif
     }
     pthread_mutex_unlock(&dev->sync_mutex);
+#ifdef DEBUG_SYNC
+    printf("recvd\n\n");
+#endif
 
     return 0;
 }
 
-void* ThreadTxFunc(void* input) 
+void* ThreadTxFunc(void* input)
 {
     devHandle_t* dev = (devHandle_t*)input;
     struct sched_param param = {TX_THREAD_PRIORITY};
     int err = 0;
     bool needSync = false;
 
-    if(sched_setscheduler(CURRENT_TID, SCHED_RR, &param)) {
+    if(sched_setscheduler(CURRENT_TID, SCHED_RR, &param) != 0) {
         err = errno;
-        printf("Failed to set RX Thread priority with error %d\n", err);
+        printf("Failed to set TX Thread priority with error %d\n", err);
         printf("Exiting tx thread with dest=%s\n", dev->dest_ip);
         pthread_exit(NULL);
     }
 
+    // Force sync
+    dev->ack_pend = MAX_ACK_PEND;
     if(SyncThreads(dev) < 0) {
         printf("Failed to sync threads\n");
         printf("Exiting tx thread with dest=%s\n", dev->dest_ip);
@@ -479,22 +498,35 @@ void* ThreadTxFunc(void* input)
     }
 
     // Loop while dev is running or cmds in buffer
-    while(dev->runFlag) {  
+    while(dev->runFlag) {
         // Send next msg on buffer
         sem_wait(&dev->buf_full);
-        pthread_mutex_lock(&dev->buf_mutex);
-        if (SendMessage(&dev->cmd_buf[dev->cmd_consume_idx], dev->fd) < 0) {
+#ifdef DEBUG_TX
+        char frame_str[DBG_BUFF_SIZE];
+        printf("send [%u]: %s\n", dev->cmd_consume_idx, get_msg_str(&(dev->cmd_buf[dev->cmd_consume_idx]), frame_str));
+        //msg_t* ptr = &(dev->cmd_buf[dev->cmd_consume_idx]);
+        //printf("0x");
+        //for(int i = 0; i < MAX_RS232_BYTES; i++) {
+        //    printf("%x ", ptr->RS232_data[i]);
+        //}
+        //printf("%d\n", ptr->length);
+        //printf("addr=%p\n", (void*)&(dev->cmd_buf[dev->cmd_consume_idx]));
+#endif
+        if(SendMessage(&(dev->cmd_buf[dev->cmd_consume_idx]), dev->fd) < 0) {
             printf("Failed to send motor command\n");
             break;
         }
         dev->cmd_consume_idx = (dev->cmd_consume_idx + 1) % MAX_CMD_PEND;
-        pthread_mutex_unlock(&dev->buf_mutex);
         sem_post(&dev->buf_empty);
+        sched_yield();
 
-        // Handle if comm is unsync
+        // Handle if comm has lost sync
         pthread_mutex_lock(&dev->sync_mutex);
         dev->ack_pend++;
         needSync = dev->ack_pend > MAX_ACK_PEND;
+#ifdef DEBUG_SYNC
+        printf("Resync required\n");
+#endif
         pthread_mutex_unlock(&dev->sync_mutex);
         if(needSync) {
             if(SyncThreads(dev) < 0) {
@@ -518,6 +550,9 @@ static uint16_t ConnectDev(devHandle_t* dev)
     const uint8_t conn_resp[NUM_CONN_MSG] = {CONN_RESP1, CONN_RESP2, CONN_RESP3, CONN_RESP4};
 
     for(uint8_t i = 0; i < NUM_CONN_MSG; i++) {
+#ifdef DEBUG_STARTUP
+        printf("Sending conn msg %d....", i);
+#endif
         msg.length = conn_msg_size[i];
         memset(msg.RS232_data, 0, sizeof(msg.RS232_data));
         memcpy(msg.RS232_data, conn_msg[i], msg.length);
@@ -525,16 +560,28 @@ static uint16_t ConnectDev(devHandle_t* dev)
             printf("Could not send conn msg %u\n", i);
             return CONN_ERR;
         }
+#ifdef DEBUG_STARTUP
+        printf("sent\n");
+#endif
 
+#ifdef DEBUG_STARTUP
+        printf("Recving conn resp %d....", i);
+#endif
         // Initialize receive buffer
         memset(&dev->rx_buf, 0, BUFLEN);
-        if (ReceiveMessage(&dev->rx_buf, dev->fd) < 0) {
-            printf("Could not receive conn resp %u\n", i);
+        if (ReceiveMessage(&dev->rx_buf, dev->fd) <= 0) {
+            printf("Could not recv conn resp %u\n", i);
             return CONN_ERR;
         }
+#ifdef DEBUG_STARTUP
+        printf("recvd\n");
+#endif
 
         if(dev->rx_buf.RS232_data[0] != conn_resp[i]) {
             printf("Unexpected response to conn msg %u\n", i);
+#ifdef DEBUG_STARTUP
+            printf("Recvd:%d Exp:%d\n", dev->rx_buf.RS232_data[0], conn_resp[i]);
+#endif
             return CONN_ERR;
         }
     }
@@ -546,14 +593,13 @@ static uint16_t DisconnectDev(devHandle_t* dev)
 {
     msg_t msg;
 
-    if(ConnectSock(dev->dest_ip, CONN_PORT, dev->fd) < 0) {
+    if(ConnectSock(dev->dest_ip, dev->dest_conn_port, dev->fd) < 0) {
         printf("Failed to connect to conn port for remote addr %s\n", dev->dest_ip);
         CleanSock(&dev->fd);
         dev->fd = -1;
         return CONN_ERR;
     }
 
-    memset(&msg, 0, sizeof(msg));
     msg.length = sizeof(DISCONN_MSG);
     memset(msg.RS232_data, 0, sizeof(msg.RS232_data));
     memcpy(msg.RS232_data, DISCONN_MSG, msg.length);
@@ -563,8 +609,8 @@ static uint16_t DisconnectDev(devHandle_t* dev)
     }
 
     memset(&dev->rx_buf, 0, BUFLEN);
-    if (ReceiveMessage(&dev->rx_buf, dev->fd)) {
-        printf("Could not receive disconnect response\n");
+    if (ReceiveMessage(&dev->rx_buf, dev->fd) <= 0) {
+        printf("Could not recv disconnect response\n");
         return CONN_ERR;
     }
 
@@ -599,7 +645,7 @@ static void ShutdownDev(devHandle_t* dev)
             err = errno;
             printf("pthread_join for tx failed with errno=%d\n", err);
         }
-        dev->txThreadValid = true;
+        dev->txThreadValid = false;
     }
 
     if(dev->fd > -1) {
@@ -607,7 +653,7 @@ static void ShutdownDev(devHandle_t* dev)
             printf("Processing threads complete, disconnecting\n");
             DisconnectDev(dev);
         }
-        printf("Closing Socket\n");
+        printf("Closing socket\n");
         CleanSock(&dev->fd);
     }    
 
@@ -616,30 +662,50 @@ static void ShutdownDev(devHandle_t* dev)
     dev->cmd_produce_idx = 0;
 }
 
-static void StartDev(devHandle_t* dev)
+static int StartDev(devHandle_t* dev)
 {
+#ifdef DEBUG_STARTUP
+    printf("***Dev Settings***\n");
+    printf("Local: %s:%d\n", dev->local_ip, dev->local_port);
+    printf("Remote: %s:%d\n", dev->dest_ip, dev->dest_conn_port);
+#endif 
+    
     // In case we are currently running call shutdown first;
     ShutdownDev(dev);
-    
-    // Socket for all comm
-    if(InitSock(dev->local_ip, dev->local_port, dev->dest_ip, CONN_PORT, RX_TIMEOUT_MS)) {
-        printf("Failed to init connection to %s", dev->dest_ip);
-        return;
-    }
 
-    printf("Conn configured.\n");
-    uint16_t conn_count=0;
+#ifdef DEBUG_STARTUP
+    printf("Configuring socket....");
+#endif
+    // Socket for all comm
+    dev->fd = InitSock(dev->local_ip, dev->local_port, dev->dest_ip, dev->dest_conn_port, RX_TIMEOUT_MS);
+    if(dev->fd < 0) {
+        printf("Failed to init connection to %s\n", dev->dest_ip);
+        return -1;
+    }
+#ifdef DEBUG_STARTUP
+    printf("configured\n");
+#endif
+    uint16_t conn_count = 0;
     while (conn_count < 5 && ConnectDev(dev) != CONN_OK) {
         conn_count++;
+#ifdef DEBUG_STARTUP
+        printf("Connection attempt %d failed\n\n", conn_count);
+#endif
     }
 
-    //setup the connection to the technosoft drive
+    // Setup the connection to the technosoft drive
     if(conn_count < 5) {
         // Associate with the cmd port now
-        if(ConnectSock(dev->dest_ip, CMD_PORT, dev->fd) < 0) {
+#ifdef DEBUG_STARTUP
+        printf("Connecting to cmd port....");
+#endif
+        if(ConnectSock(dev->dest_ip, dev->dest_cmd_port, dev->fd) < 0) {
             printf("Failed to connect to remote address %s port %u\n", dev->dest_ip, CMD_PORT);
-            return;
+            return -1;
         }
+#ifdef DEBUG_STARTUP
+        printf("connected\n");
+#endif
         // Initialize buffer synch structures
         sem_init(&dev->buf_empty, SEM_NOTSHARED, MAX_CMD_PEND);
         sem_init(&dev->buf_full, SEM_NOTSHARED, 0);
@@ -647,33 +713,46 @@ static void StartDev(devHandle_t* dev)
         dev->runFlag = 1;
         if(pthread_create(&dev->rxThreadHandle, NULL, ThreadRxFunc, dev) != 0) {
             printf("Failed to start dev rx thread\n");
-            return;
+            return -1;
         }
+#ifdef DEBUG_STARTUP
+        printf("Rx thread created\n");
+#endif
         dev->rxThreadValid = true;
-        if(pthread_create(&dev->txThreadHandle, NULL, ThreadTxFunc, dev)) {
+        if(pthread_create(&dev->txThreadHandle, NULL, ThreadTxFunc, dev) != 0) {
             printf("Failed to start dev tx thread\n");
-            return;
+            return -1;
         }
+#ifdef DEBUG_STARTUP
+        printf("Tx thread created\n\n");
+#endif
         dev->txThreadValid = true;
+        return 0;
     } else {
         printf("Failed to connect to drive\n");
+        return -1;
     }
 }
 
+// Add command to the buffer
 static void AddCmd(devHandle_t* dev, msg_t* cmd)
 {
-    struct timespec timeout = {.tv_sec = SEND_TIMEOUT_S, .tv_nsec = 0};
-    if(sem_timedwait(&dev->buf_empty, &timeout) < 0) {
-        printf("Failed to add msg to cmd buf\n");
-        return;
-    }
-    pthread_mutex_lock(&dev->buf_mutex);
-    
-    msg_t* slot = &dev->cmd_buf[dev->cmd_produce_idx];
-    memcpy(slot, cmd, sizeof(msg_t));
+    //struct timespec timeout = {.tv_sec = SEND_TIMEOUT_S, .tv_nsec = 0};
+
+    //if(sem_timedwait(&dev->buf_empty, &timeout) < 0) {
+    //    printf("Cmd buffer full\n");
+    //    return;
+    //}
+    sem_wait(&dev->buf_empty);
+    memcpy(&(dev->cmd_buf[dev->cmd_produce_idx]), cmd, sizeof(msg_t));
+#ifdef DEBUG_TX
+    //char frame_str[DBG_BUFF_SIZE];
+    //printf("cmd: %s\n", get_msg_str(cmd, frame_str));
+    //printf("buf [%u]: %s\n", dev->cmd_produce_idx, get_msg_str(&(dev->cmd_buf[dev->cmd_produce_idx]), frame_str));
+    //printf("addr=%p\n", (void*)&(dev->cmd_buf[dev->cmd_produce_idx]));
+#endif
     dev->cmd_produce_idx = (dev->cmd_produce_idx + 1) % MAX_CMD_PEND;
-    
-    pthread_mutex_unlock(&dev->buf_mutex);
+
     sem_post(&dev->buf_full);
 }
 
@@ -690,30 +769,43 @@ void AddCmdNeck(msg_t* cmd)
 // Start the library
 void __attribute__ ((constructor)) Start(void)
 {
-    int err; 
+    //int err; 
     struct timespec currTime = {0,0};
     clock_gettime(CLOCK_MONOTONIC, &currTime);
     timebase = currTime.tv_sec*NANO_TO_SECS + currTime.tv_nsec;
 
-    // Elevate priority of current process
-    if(setpriority(PRIO_PROCESS, CURRENT_PID, PROCESS_PRIORITY)) {
+    /*// Elevate priority of current process
+    struct rlimit rlim = {0,0};
+    if(getrlimit(RLIMIT_NICE, &rlim) < 0) {
         err = errno;
-        printf("setpriority failed with errno=%d\n", err);
+        printf("getrlim failed with errno=%d\n", err);
     }
+    printf("Soft lim=%lu Hard Lim=%lu\n", rlim.rlim_cur, rlim.rlim_max);
 
-    // Elevate priority of current process
-    if(setpriority(PRIO_PROCESS, CURRENT_PID, PROCESS_PRIORITY)) {
+    if(setpriority(PRIO_PROCESS, CURRENT_PID, PROCESS_PRIORITY) < 0) {
         err = errno;
         printf("setpriority failed with errno=%d\n", err);
-    }
+    }*/
 
     InitLib(HOST_ID, BAUDRATE_115200);
-    DisableEyeCtrl();
-    StartDev(&eye);
-    DisableNeckCtrl();
-    StartDev(&neck);
+    
+#ifdef DEBUG_STARTUP
+    // During tests, eye and neck need different ports
+    eye.dest_cmd_port = EYE_CMD_PORT;
+    eye.dest_conn_port = EYE_CONN_PORT;
+    neck.dest_cmd_port = NECK_CMD_PORT;
+    neck.dest_conn_port = NECK_CONN_PORT;
+#endif
 
-    printf("Initialised.\n");
+    if(StartDev(&eye) == 0 && StartDev(&neck) == 0) {
+        printf("Initialized\n");
+        DisableEyeCtrl();
+        //DisableNeckCtrl();
+    } else {
+        ShutdownDev(&eye);
+        ShutdownDev(&neck);
+        printf("Failed to properly initialize\n");
+    }    
 }
 
 void __attribute__ ((destructor)) Cleanup(void)

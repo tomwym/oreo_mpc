@@ -9,10 +9,9 @@
 #define SEND_TIMEOUT_S		        (1.0)
 #define BUFLEN 			            (32)  	
 #define LOG_BUFLEN		            (1024)
-#define MAX_ACK_PEND 		        (4)  //limit how much we pound the drives with polls for data
-#define MAX_CMD_PEND 		        (8)  //must be a power of 2
+#define MAX_ACK_PEND 		        (8)  //limit how much we pound the drives with polls for data
+#define MAX_CMD_PEND 		        (uint8_t)(16)  //must be a power of 2
 
-#define CONN_PORT		            (uint16_t)(30689u)
 #define CONN_MSG1		            ((uint8_t[]){0x01,0xA4,0x06})
 #define CONN_RESP1		            ((uint8_t)0x02)
 #define CONN_MSG2                   ((uint8_t[]){0x03,0x80,0x25,0x00,0x00})
@@ -35,6 +34,8 @@ typedef enum {
     CONN_SYNC_ERR,
 } conn_state_t;
 
+#define STARTUP_TEST
+#ifndef STARTUP_TEST
 #define HOST_ID                     (120)
 #define LOCAL_IP                    ("192.168.2.8")
 #define NECK_LOCAL_PORT		        (51244u)
@@ -42,8 +43,23 @@ typedef enum {
 #define NECK_IP			            ("192.168.2.15")
 #define EYE_IP			            ("192.168.2.14")
 #define CMD_PORT                    (uint16_t)(1700u)
-#define COMM_PORT		            (uint16_t)(30689u)
+#define CONN_PORT		            (uint16_t)(30689u)
 #define MSG_ACK			            ((uint8_t)0x4F)
+#else
+#define HOST_ID                     (120)
+#define LOCAL_IP                    ("192.168.2.8")
+#define NECK_LOCAL_PORT		        (51244u)
+#define EYE_LOCAL_PORT		        (51243u)
+#define NECK_IP			            ("192.168.2.2")
+#define EYE_IP			            ("192.168.2.2")
+#define CMD_PORT                    (uint16_t)(1700u)
+#define CONN_PORT		            (uint16_t)(30689u)
+#define EYE_CMD_PORT                CMD_PORT
+#define EYE_CONN_PORT               CONN_PORT
+#define NECK_CMD_PORT               (CMD_PORT+1)
+#define NECK_CONN_PORT              (CONN_PORT+1)
+#define MSG_ACK			            ((uint8_t)0x4F)
+#endif
 
 typedef RS232_MSG msg_t;
 
@@ -184,7 +200,6 @@ void SetEyeForce(uint8_t axis, double force_n);
 // Constructors/Destructor for the library
 void Start(void);
 void Cleanup(void);
-
 
 // For RS232 module to write frames to buffer
 void AddCmdEye(msg_t* cmd);
