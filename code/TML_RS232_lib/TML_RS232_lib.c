@@ -295,7 +295,7 @@ static void SetMotionMode(dest_dev_t dev, motor_id_t* dest, uint32_t mode)
 }
 
 // Wrapper function for MODEPP
-void FormatSetModePP(dest_dev_t dev, motor_id_t* dest)
+void SetModePP(dest_dev_t dev, motor_id_t* dest)
 {
     SetMotionMode(dev, dest, MODE_PP_PAYLOAD);
 }

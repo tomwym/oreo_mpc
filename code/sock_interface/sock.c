@@ -47,6 +47,7 @@ int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, 
         addrStruct.s4.sin_family = AF_INET;
         addrStruct.s4.sin_port = htons(localPort);
     } else {
+        printf("Failed to format local address %s into IP address", localAddr);
         return -1;
     }
 
@@ -60,12 +61,22 @@ int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, 
 
     // Allow address re-use local address and bind
     int on = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*)&on, sizeof(on));
-    int timeout = timeoutMs;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    if(bind(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in))) {
+    if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
         sockErr = errno;
-        printf("Failed to bind socket to local addr with err=%d\n", sockErr);
+        printf("Failed to set reuse address option for socket with err=%d\n", sockErr);
+        return -1;
+    }
+    
+    struct timeval tv = {.tv_sec = timeoutMs/1000, .tv_usec = timeoutMs%1000};
+    if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+        sockErr = errno;
+        printf("Failed to set recv timeout for socket with err=%d\n", sockErr);
+        return -1;
+    }
+
+    if(bind(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in)) < 0) {
+        sockErr = errno;
+        printf("Failed to bind socket to %s with err=%d\n", localAddr, sockErr);
         return -1;
     }
 
@@ -81,13 +92,13 @@ int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, 
 
     // Connect to remote
     // Connect() on a udp socket sets the default address to send messages to
-    if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in))) {
+    if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in)) < 0) {
         sockErr = errno;
-        printf("Failed to connect to remote address with err=%d\n", sockErr);
+        printf("Failed to connect to %s with err=%d\n", remoteAddr, sockErr);
         return -1;
     }
 
-    return 0;
+    return fd;
 }
 
 // Connect socket to new remote
@@ -114,7 +125,7 @@ int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd)
 
     // Connect to remote
     // Connect() on a udp socket sets the default address to send messages to
-    if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in))) {
+    if(connect(fd, (const struct sockaddr*)&addrStruct, (socklen_t)sizeof(struct sockaddr_in)) < 0) {
         sockErr = errno;
         printf("Failed to connect to remote address with err=%d\n", sockErr);
         return -1;
@@ -172,7 +183,7 @@ int SendMessage(RS232_MSG * msg, int fd)
     return 0;
 }
 
-// Receive CAN Message
+// Receive RS232 Message
 int ReceiveMessage(RS232_MSG * msg, int fd)
 {
     int sockErr = 0;
@@ -193,15 +204,20 @@ int ReceiveMessage(RS232_MSG * msg, int fd)
     }*/
 
     // Read message
+    memset(msg, 0, sizeof(RS232_MSG));
     int recvBytes = recv(fd, msg->RS232_data, MAX_RS232_BYTES, 0);
     if(recvBytes < 0) {
         sockErr = errno;
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            // no msg to recv
+            return 0;
+        }
         printf("Error on recv (err=%d)\n", sockErr);
         return -1;
     }
     msg->length = recvBytes;
 
-    return 0;
+    return recvBytes;
 }
 
 // Empty the receive buffer

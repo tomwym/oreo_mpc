@@ -21,7 +21,7 @@ typedef union addr{
 // Else returns -1
 int InitSock(const char* localAddr, uint16_t localPort, const char* remoteAddr, uint16_t remotePort, int timeoutMs);
 
-// Connect socket to new remote
+// Connect socket to new remote address
 int ConnectSock(const char* remoteAddr, uint16_t remotePort, int fd);
 
 // Clean up socket

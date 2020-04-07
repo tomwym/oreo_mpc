@@ -195,10 +195,10 @@ static void Test_GoTo()
     uint8_t passed = 0;
     id_type_t idTypes[NUM_GOTO_TESTS] = {ID_TYPE_AXIS, ID_TYPE_GROUP, ID_TYPE_BROADCAST, ID_TYPE_AXIS};
     uint8_t ids[NUM_GOTO_TESTS] = {186, 7, 0, 8};
-    uint16_t addr[NUM_GOTO_TESTS] = {MOTION_LOOP_IP, WAIT_LOOP_IP, MOTION_LOOP_NECK_IP, WAIT_LOOP_NECK_IP};
+    uint16_t addr[NUM_GOTO_TESTS] = {POSN_LOOP_EYE_IP, WAIT_LOOP_EYE_IP, POSN_LOOP_NECK_IP, WAIT_LOOP_NECK_IP};
     RS232_MSG exp_frame[NUM_GOTO_TESTS] = {
-        {.RS232_data = {0x06, 0x0B, 0xA0, 0x74, 0x00, 0x40, 0x22, 0x87}, .length = 8},
-        {.RS232_data = {0x06, 0x14, 0x00, 0x74, 0x00, 0x40, 0x1B, 0xE9}, .length = 8},
+        {.RS232_data = {0x06, 0x0B, 0xA0, 0x74, 0x00, 0x40, 0x25, 0x87}, .length = 8},
+        {.RS232_data = {0x06, 0x14, 0x00, 0x74, 0x00, 0x40, 0x1E, 0xE9}, .length = 8},
         {.RS232_data = {0x06, 0x10, 0x00, 0x74, 0x00, 0x40, 0x3B, 0x05}, .length = 8},
         {.RS232_data = {0x06, 0x00, 0x80, 0x74, 0x00, 0x40, 0x34, 0x6E}, .length = 8},
     };
