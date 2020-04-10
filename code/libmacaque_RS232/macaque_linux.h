@@ -22,8 +22,9 @@
 #define CONN_RESP4      	        ((uint8_t)0x04)
 #define NUM_CONN_MSG                (4)
 #define CONN_SYNC_RESP		        (0x0Du)
+#define CONN_SYNC_RESP_BYTES        (1)
 #define CONN_SYNC_BYTES		        (15)
-#define CONN_SYNC_BYTE		        (0xFFu)
+#define CONN_SYNC   		        (0xFFu)
 #define DISCONN_MSG		            ((uint8_t[]){0x05})
 #define DISCONN_RESP		        ((uint8_t)0x06)
 
@@ -74,9 +75,9 @@ typedef enum {
 // Axis id mapping
 typedef enum {
     EYE_YAW_LEFT_AXIS = 1,
+    EYE_YAW_RIGHT_AXIS,
     EYE_PITCH_LEFT_AXIS,
     EYE_PITCH_RIGHT_AXIS,
-    EYE_YAW_RIGHT_AXIS,
 } eye_axis_t;
 
 // Log data id
@@ -151,24 +152,23 @@ typedef struct eyeCalData {
 } eyeCalData_t;
 
 typedef struct eyeData {
+    double time;
     double yaw[NUM_EYES];
     double yaw_offset[NUM_EYES];
     double pitch[NUM_EYES];
     double pitch_offset[NUM_EYES];
-    double time;
+    double torque[NUM_EYE_AXIS];
 } eyeData_t;
 
 typedef struct neckData {
-    double yaw;
-    double pitch;
-    double roll;
-    double torque[NUM_NECK_AXIS];
     double time;
+    double pos[NUM_NECK_AXIS];
+    double torque[NUM_NECK_AXIS];
 } neckData_t;
 
 /* neck controller functions */
 // Get some data
-neckData_t* getNeckData(void);
+neckData_t* GetNeckData(void);
 // Position Control
 void DisableNeckCtrl(void);
 void SetNeckPosn(uint8_t axis, double pos_rad);

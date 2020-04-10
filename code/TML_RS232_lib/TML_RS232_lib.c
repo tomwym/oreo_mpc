@@ -103,10 +103,10 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
 {
     // All offsets are shifted by one due to synchronization byte 0
     // Extract relevant data
-    uint8_t length = frame->RS232_data[OFFSET_LENGTH+1];
+    uint8_t length = frame->RS232_data[OFFSET_LENGTH];
     
-    uint16_t destCode = ADD_BYTES(frame->RS232_data[OFFSET_IDCODE_HIGH+1], frame->RS232_data[OFFSET_IDCODE_LOW+1]);
-    uint16_t optCode = ADD_BYTES(frame->RS232_data[OFFSET_OPTCODE_HIGH+1], frame->RS232_data[OFFSET_OPTCODE_LOW+1]);
+    uint16_t destCode = ADD_BYTES(frame->RS232_data[OFFSET_IDCODE_HIGH], frame->RS232_data[OFFSET_IDCODE_LOW]);
+    uint16_t optCode = ADD_BYTES(frame->RS232_data[OFFSET_OPTCODE_HIGH], frame->RS232_data[OFFSET_OPTCODE_LOW]);
     uint8_t payloadLength = length - sizeof(optCode) - sizeof(destCode);
     // Check message recipient
     uint8_t id = GET_ID(destCode);
@@ -117,12 +117,12 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
 
     // Sort based on type of message    
     // Take Data 1 message
-    if((frame->RS232_data[OFFSET_OPTCODE_HIGH+1] == TAKE_DATA)) {
+    if((frame->RS232_data[OFFSET_OPTCODE_HIGH] == TAKE_DATA)) {
         // The first two bytes of payload is source axisId
-        *axis = MIDBYTE(frame->RS232_data[OFFSET_DATA_WORD1_LOW+1], frame->RS232_data[OFFSET_DATA_WORD1_HIGH+1]);
+        *axis = MIDBYTE(frame->RS232_data[OFFSET_DATA_WORD1_LOW], frame->RS232_data[OFFSET_DATA_WORD1_HIGH]);
         
         // LSB determines size of data returned
-        if(frame->RS232_data[OFFSET_OPTCODE_LOW+1] & 0x1) {
+        if(frame->RS232_data[OFFSET_OPTCODE_LOW] & 0x1) {
             // Check that frame size matches expected
             if(payloadLength != TAKE_32BIT_SIZE) {
                 printf("Expected payload size (%d) does not match recvd size (%d)\n", TAKE_32BIT_SIZE, payloadLength);
@@ -130,8 +130,8 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
             }
             
             // Parse payload
-            *data = ADD_WORDS((ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD4_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD4_LOW+1])), ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD3_LOW+1]));
-            *reg_addr = (frame->RS232_data[OFFSET_DATA_WORD2_LOW+1])|((uint16_t)frame->RS232_data[OFFSET_DATA_WORD2_HIGH+1] << 8);
+            *data = ADD_WORDS((ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD4_HIGH], frame->RS232_data[OFFSET_DATA_WORD4_LOW])), ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH], frame->RS232_data[OFFSET_DATA_WORD3_LOW]));
+            *reg_addr = (frame->RS232_data[OFFSET_DATA_WORD2_LOW])|((uint16_t)frame->RS232_data[OFFSET_DATA_WORD2_HIGH] << 8);
         } else {
             // Check that frame size matches expected
             if(payloadLength != TAKE_16BIT_SIZE) {
@@ -140,12 +140,12 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
             }
             
             // Parse payload
-            *data = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD3_LOW+1]);
-            *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD2_LOW+1]);
+            *data = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH], frame->RS232_data[OFFSET_DATA_WORD3_LOW]);
+            *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH], frame->RS232_data[OFFSET_DATA_WORD2_LOW]);
         }
-    } else if(frame->RS232_data[OFFSET_OPTCODE_HIGH+1] == TAKE_DATA2_16) {
+    } else if(frame->RS232_data[OFFSET_OPTCODE_HIGH] == TAKE_DATA2_16) {
         // 2 bytes after Group Bit is axisId
-        *axis = frame->RS232_data[OFFSET_OPTCODE_LOW+1];
+        *axis = frame->RS232_data[OFFSET_OPTCODE_LOW];
         
         if(payloadLength != TAKE2_16BIT_SIZE) {
             printf("Expected payload size (%d) does not match recvd size (%d)\n", TAKE2_16BIT_SIZE, payloadLength);
@@ -153,11 +153,11 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
         }
 
         // 16 bits returned
-        *data = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD2_LOW+1]);
-        *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD1_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD1_LOW+1]);
-    } else if(frame->RS232_data[OFFSET_OPTCODE_HIGH+1] == TAKE_DATA2_32) {
+        *data = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH], frame->RS232_data[OFFSET_DATA_WORD2_LOW]);
+        *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD1_HIGH], frame->RS232_data[OFFSET_DATA_WORD1_LOW]);
+    } else if(frame->RS232_data[OFFSET_OPTCODE_HIGH] == TAKE_DATA2_32) {
         // 2 bytes after Group Bit is axisId
-        *axis = frame->RS232_data[OFFSET_OPTCODE_LOW+1];
+        *axis = frame->RS232_data[OFFSET_OPTCODE_LOW];
 
         if(payloadLength != TAKE2_32BIT_SIZE) {
             printf("Expected payload size (%d) does not match recvd size (%d)\n", TAKE2_32BIT_SIZE, payloadLength);
@@ -165,8 +165,8 @@ int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* 
         }
         
         // 32 bits returned
-        *data = ADD_WORDS(ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD3_LOW+1]), ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD2_LOW+1]));
-        *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD1_HIGH+1], frame->RS232_data[OFFSET_DATA_WORD1_LOW+1]);
+        *data = ADD_WORDS(ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD3_HIGH], frame->RS232_data[OFFSET_DATA_WORD3_LOW]), ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD2_HIGH], frame->RS232_data[OFFSET_DATA_WORD2_LOW]));
+        *reg_addr = ADD_BYTES(frame->RS232_data[OFFSET_DATA_WORD1_HIGH], frame->RS232_data[OFFSET_DATA_WORD1_LOW]);
     } else {
         printf("Recvd RS232 message with unexpected optCode (%x)\n", optCode);
         return -1;

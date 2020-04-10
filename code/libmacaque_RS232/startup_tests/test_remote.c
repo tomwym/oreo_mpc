@@ -37,6 +37,7 @@ typedef struct {
 #define CONN_RESP4      	        ((uint8_t)0x04)
 #define NUM_CONN_MSG                (4)
 #define CONN_SYNC_RESP		        (0x0Du)
+#define CONN_SYNC_RESP_BYTES        (1)
 #define CONN_SYNC_BYTES		        (15)
 #define CONN_SYNC_BYTE		        (0xFFu)
 #define DISCONN_MSG		            ((uint8_t[]){0x05})
@@ -145,14 +146,8 @@ bool PerformSync(test_handle_t* dev)
     }
 
     memset(&frame.RS232_data, 0, MAX_RS232_BYTES);
-    frame.length = CONN_SYNC_BYTES;
-    for(int i = 0; i < CONN_SYNC_BYTES; i++) {
-        if(i == CONN_SYNC_BYTES-1) {
-            frame.RS232_data[i] = CONN_SYNC_RESP;
-        } else {
-            frame.RS232_data[i] = 0x00;
-        }
-    }
+    frame.length = CONN_SYNC_RESP_BYTES;
+    frame.RS232_data[0] = CONN_SYNC_RESP;
     int send_bytes = send(dev->cmd_fd, (const char*)frame.RS232_data, frame.length, 0);
     if(send_bytes != frame.length) {
         printf("Failed to send sync resp : %d\n", WSAGetLastError());
@@ -162,19 +157,116 @@ bool PerformSync(test_handle_t* dev)
     return true;
 }
 
-/*DWORD WINAPI TxThread(LPVOID input)
+#define NUM_EYE_TX_MSG      (4)
+DWORD WINAPI EyeTxThread(LPVOID input)
 {
     test_handle_t* dev = (test_handle_t*)(input);
     Sleep(1000);
 
-    while(1) {
+    // payload pattern:
+    // axis id = 1 --> payload: 0x12345678 or 0x1234
+    // axis id = 2 --> payload: 0x23456789 or 0x2345
+    // axis id = 3 --> payload: 0x3456789A or 0x3456
+    // axis id = 4 --> payload: 0x456789AB or 0x4567
+    RS232_MSG apos_frame[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x01, 0x02, 0x28, 0x56, 0x78, 0x12, 0x34, 0xA6}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x02, 0x02, 0x28, 0x67, 0x89, 0x23, 0x45, 0xEB}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x03, 0x02, 0x28, 0x78, 0x9A, 0x34, 0x56, 0x30}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x04, 0x02, 0x28, 0x89, 0xAB, 0x45, 0x67, 0x75}, .length = 12},
+    };
+    
+    RS232_MSG poserr_frame[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x01, 0x02, 0x2A, 0x12, 0x34, 0xD7}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x02, 0x02, 0x2A, 0x23, 0x45, 0xFA}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x03, 0x02, 0x2A, 0x34, 0x56, 0x1D}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x04, 0x02, 0x2A, 0x45, 0x67, 0x40}, .length = 10},
+    };
 
+    RS232_MSG tpos_frame[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x01, 0x02, 0xB2, 0x56, 0x78, 0x12, 0x34, 0x30}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x02, 0x02, 0xB2, 0x67, 0x89, 0x23, 0x45, 0x75}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x03, 0x02, 0xB2, 0x78, 0x9A, 0x34, 0x56, 0xBA}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x04, 0x02, 0xB2, 0x89, 0xAB, 0x45, 0x67, 0xFF}, .length = 12},
+    };
+
+    RS232_MSG apos2_frame[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x01, 0x08, 0x1C, 0x56, 0x78, 0x12, 0x34, 0xA0}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x02, 0x08, 0x1C, 0x67, 0x89, 0x23, 0x45, 0xE5}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x03, 0x08, 0x1C, 0x78, 0x9A, 0x34, 0x56, 0x2A}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x04, 0x08, 0x1C, 0x89, 0xAB, 0x45, 0x67, 0x6F}, .length = 12},
+    };
+
+    RS232_MSG var_cal_apos2_off[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x01, 0x03, 0xB0, 0x56, 0x78, 0x12, 0x34, 0x2F}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x02, 0x03, 0xB0, 0x67, 0x89, 0x23, 0x45, 0x74}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x03, 0x03, 0xB0, 0x78, 0x9A, 0x34, 0x56, 0xB9}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x04, 0x03, 0xB0, 0x89, 0xAB, 0x45, 0x67, 0xFE}, .length = 12},
+    };
+
+    RS232_MSG var_cal_run[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x01, 0x03, 0xB3, 0x12, 0x34, 0x61}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x02, 0x03, 0xB3, 0x23, 0x45, 0x84}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x03, 0x03, 0xB3, 0X34, 0x56, 0xA7}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x04, 0x03, 0xB3, 0x45, 0x67, 0xCA}, .length = 10},
+    };
+
+    RS232_MSG var_cal_cur[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x01, 0x03, 0xB2, 0x12, 0x34, 0x60}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x02, 0x03, 0xB2, 0x23, 0x45, 0x83}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x03, 0x03, 0xB2, 0x34, 0x56, 0xA6}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x04, 0x03, 0xB2, 0x45, 0x67, 0xC9}, .length = 10},
+    };
+
+    RS232_MSG iq_frame[NUM_EYE_TX_MSG] = {
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x01, 0x02, 0x30, 0x12, 0x34, 0xDD}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x02, 0x02, 0x30, 0x23, 0x45, 0x00}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0X03, 0x02, 0x30, 0x34, 0x56, 0x23}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x04, 0x02, 0x30, 0x45, 0x67, 0x46}, .length = 10},
+    };
+
+    for(int i = 0; i < NUM_EYE_TX_MSG; i++) {
+        int send_bytes = send(dev->cmd_fd, (const char*)var_cal_run[i].RS232_data, var_cal_run[i].length, 0);
+        if(send_bytes != var_cal_run[i].length) {
+            printf("Failed to send eye tx : %d\n", WSAGetLastError());
+            goto done_eye_tx;
+        }
+    }
+
+    done_eye_tx:
+    printf("Exiting eye tx thread\n");
+    return 0;
+}
+
+#define NUM_NECK_TX_MSG  (3)
+DWORD WINAPI NeckTxThread(LPVOID input)
+{
+    test_handle_t* dev = (test_handle_t*)(input);
+    Sleep(1000);
+
+    RS232_MSG apos_frame[NUM_NECK_TX_MSG] = {
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x01, 0x02, 0x28, 0x56, 0x78, 0x12, 0x34, 0xA6}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x02, 0x02, 0x28, 0x67, 0x89, 0x23, 0x45, 0xEB}, .length = 12},
+        {.RS232_data = {0x0A, 0x07, 0x81, 0xD5, 0x03, 0x02, 0x28, 0x78, 0x9A, 0x34, 0x56, 0x30}, .length = 12},
+    };
+
+    RS232_MSG iq_frame[NUM_NECK_TX_MSG] = {
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x01, 0x02, 0x30, 0x12, 0x34, 0xDD}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x02, 0x02, 0x30, 0x23, 0x45, 0x00}, .length = 10},
+        {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x03, 0x02, 0x30, 0x34, 0x56, 0x23}, .length = 10},
+    };
+
+    for(int i = 0; i < NUM_NECK_TX_MSG; i++) {
+        int send_bytes = send(dev->cmd_fd, (const char*)apos_frame[i].RS232_data, apos_frame[i].length, 0);
+        if(send_bytes != apos_frame[i].length) {
+            printf("Failed to send neck tx : %d\n", WSAGetLastError());
+            goto done_neck_tx;
+        }
     }
     
-    done_tx:
-    printf("Exiting rx thread\n");
+    done_neck_tx:
+    printf("Exiting neck tx thread\n");
     return 0;
-}*/
+}
 
 DWORD WINAPI RxThread(LPVOID input)
 {
@@ -205,8 +297,8 @@ DWORD WINAPI RxThread(LPVOID input)
             // Sync message
             printf("Resync\n");
             memset(&frame.RS232_data, 0, MAX_RS232_BYTES);
-            frame.length = CONN_SYNC_BYTES;
-            frame.RS232_data[CONN_SYNC_BYTES-1] = CONN_SYNC_RESP;
+            frame.length = CONN_SYNC_RESP_BYTES;
+            frame.RS232_data[CONN_SYNC_RESP_BYTES-1] = CONN_SYNC_RESP;
             int send_bytes = send(dev->cmd_fd, (const char*)frame.RS232_data, frame.length, 0);
             if(send_bytes != frame.length) {
                 printf("Failed to send sync resp : %d\n", WSAGetLastError());
@@ -222,6 +314,7 @@ DWORD WINAPI RxThread(LPVOID input)
 
             memset(&frame.RS232_data, 0, MAX_RS232_BYTES);
             frame.RS232_data[0] = 0x4F;
+            frame.length = 1;
             int send_bytes = send(dev->cmd_fd, (const char*)frame.RS232_data, frame.length, 0);
             if(send_bytes != frame.length) {
                 printf("Failed to send resp : %d\n", WSAGetLastError());
@@ -232,6 +325,46 @@ DWORD WINAPI RxThread(LPVOID input)
 
     done_rx:
     printf("Exiting rx thread\n");
+    return 0;
+}
+
+DWORD WINAPI DisconnThread(LPVOID input)
+{
+    test_handle_t* dev = (test_handle_t*)(input);
+    int recv_bytes;
+    RS232_MSG frame;
+
+    fd_set disconn;
+    FD_ZERO(&disconn);
+    FD_SET(dev->conn_fd, &disconn);
+    struct timeval timeout = {.tv_sec = 0, .tv_usec = 0};
+    
+    //while(select(FD_SETSIZE, &disconn, NULL, NULL,  &timeout) <= 0) {};
+    
+    memset(&frame, 0, sizeof(frame));
+    recv_bytes = recv(dev->conn_fd, frame.RS232_data, MAX_RS232_BYTES, 0);
+    if(recv_bytes < 0) {
+        printf("%s failed to recv disconn msg : %d\n", dev->name, WSAGetLastError());
+        return -1;
+    }
+    frame.length = recv_bytes;
+    printf("\n***Shutdown signal recvd***\n");
+
+    if(frame.RS232_data[0] != DISCONN_MSG[0]) {
+        printf("%s incorrect disconn msg recvd\n", dev->name);
+    }
+
+    printf("%s sending disconn resp....", dev->name);
+    memset(&frame.RS232_data, 0, MAX_RS232_BYTES);
+    frame.length = 1;
+    frame.RS232_data[0] = DISCONN_RESP;
+    int send_bytes = send(dev->conn_fd, (const char*)frame.RS232_data, frame.length, 0);
+    if(send_bytes != frame.length) {
+        printf("Failed to send disconn resp : %d\n", WSAGetLastError());
+    }
+    printf("done\n");
+    printf("***%s shutdown complete***\n\n", dev->name);
+
     return 0;
 }
 
@@ -418,14 +551,30 @@ int main(int argc, char* argv[])
 
     eye.handle = CreateThread(NULL, 0, RxThread, &eye, 0, eye.tid);
     if(eye.handle == NULL) {
-        printf("failed\n");
+        printf("Failed to create eye rx thread\n");
         return -1;
     }
 
     neck.handle = CreateThread(NULL, 0, RxThread, &neck, 0, neck.tid);
     if(neck.handle == NULL) {
-        printf("failed\n");
+        printf("Failed to create neck tx thread\n");
         return -1;
+    }
+
+    LPDWORD eye_disc = NULL, neck_disc = NULL;
+    if(CreateThread(NULL, 0, DisconnThread, &eye, 0, eye_disc) == NULL) {
+        printf("Failed to create eye disconn thread\n");
+    }
+    if(CreateThread(NULL, 0, DisconnThread, &neck, 0, neck_disc) == NULL) {
+        printf("Failed to create neck disconn thread\n");
+    }
+
+    LPDWORD eye_tx = NULL, neck_tx = NULL;
+    if(CreateThread(NULL, 0, EyeTxThread, &eye, 0, eye_tx) == NULL) {
+        printf("Failed to create eye tx thread\n");
+    }
+    if(CreateThread(NULL, 0, NeckTxThread, &neck, 0, neck_tx) == NULL) {
+        printf("Failed to create neck tx thread\n");
     }
 
     done:
