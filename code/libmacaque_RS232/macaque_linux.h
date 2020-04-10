@@ -7,8 +7,11 @@
 #define SHUTDOWN_TIMEOUT_MS 	    (2000)
 #define RX_TIMEOUT_MS		        (1000)
 #define SEND_TIMEOUT_S		        (1.0)
-#define BUFLEN 			            (32)  	
+#define BUFLEN 			            (100)  	
 #define LOG_BUFLEN		            (1024)
+#define LOG_FILELEN                 (15)
+#define EYE_LOG_FILENAME            ("./eye_log.csv")
+#define NECK_LOG_FILENAME           ("./neck_log.csv")
 #define MAX_ACK_PEND 		        (8)  //limit how much we pound the drives with polls for data
 #define MAX_CMD_PEND 		        (uint8_t)(16)  //must be a power of 2
 
@@ -196,6 +199,9 @@ void UpdateEyePos();
 void InitEyeForceCtrl();
 void SetEyeForce(uint8_t axis, double force_n);
 /* eye controller functions */
+
+// Flush log buffers into corresponding files
+void FlushLogs();
 
 // Constructors/Destructor for the library
 void Start(void);

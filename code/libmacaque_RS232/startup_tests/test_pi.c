@@ -104,7 +104,7 @@ int main()
             PrintEyeCal();
             PrintEyeData();
             PrintNeckData();
-            break;
+            //break;
         }
     };  
 }

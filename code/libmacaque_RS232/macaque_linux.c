@@ -89,16 +89,16 @@
 #define SEM_NOTSHARED               (0)
 #define SYNC_TRIES                  (8)
 
-#define DEBUG_RS232
 #ifdef STARTUP_TEST
 #define DEBUG_STARTUP
 #endif
 #define DEBUG_SHUTDOWN
 //#define DEBUG_SYNC
-#define DEBUG_TX
-#define DEBUG_RX
+//#define DEBUG_TX
+//#define DEBUG_RX
+#define ENABLE_LOG
 
-#ifdef DEBUG_RS232
+#if defined DEBUG_RX || defined DEBUG_TX 
 // convert RS232 to string
 static char* get_msg_str(msg_t* frame, char* buff)
 {
@@ -124,14 +124,15 @@ typedef struct rawDataLog
 {
     uint32_t		index;
     rawData_t       entry[LOG_BUFLEN];
+    char            file[LOG_FILELEN];
 } rawDataLog_t;
 
 static eyeData_t eyeData;
 static eyeCalData_t eyeCalData;
-static rawDataLog_t eyeLogData;
+static rawDataLog_t* eyeLogData = NULL;
 
 static neckData_t neckData;
-static rawDataLog_t neckLogData;
+static rawDataLog_t* neckLogData = NULL;
 
 typedef void(*rxCallbackFxn)(uint16_t, uint16_t, int32_t);
 void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data);
@@ -181,12 +182,82 @@ static devHandle_t neck = {.fd = -1, .local_ip = LOCAL_IP, .local_port = NECK_LO
 		            .host_id = HOST_ID, .callback = &NeckRxCallback, 
                     .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER};
 
+void* ThreadLogFn(void* input)
+{
+    rawDataLog_t* log = (rawDataLog_t*)input;
+    FILE* file = NULL;
+
+    file = fopen(log->file, "a");
+    if(file == NULL) {
+        printf("Failed to open %s to log data\n", log->file);
+        free(log);
+        pthread_exit(NULL);
+    }
+
+    // Beginning of file
+    if(ftell(file) == (long)0) {
+        char str[BUFLEN]="";
+        snprintf(str, BUFLEN, "Time,Log ID,Data\n");
+        if(fwrite(str, BUFLEN, 1, file) != 1) {
+            printf("Failed to write header to file %s\n", log->file);
+            fclose(file);
+            free(log);
+            pthread_exit(NULL);
+        }
+    }
+    
+    for(int i = 0; i < log->index; i++) {
+        char str[BUFLEN]="";
+        snprintf(str, DBG_BUFF_SIZE, " %.4f,%d,%.4f\n", log->entry[i].time, log->entry[i].id, log->entry[i].data);
+        if(fwrite(str, BUFLEN, 1, file) != 1) {
+            printf("Failed to write log entry %d to file %s\n", i, log->file);
+            fclose(file);
+            free(log);
+            pthread_exit(NULL);
+        }
+    }
+
+    fclose(file);
+    free(log);
+    pthread_exit(NULL);
+}
+
+// Write out log buffers to file
+void FlushLogs()
+{
+        int err;
+        pthread_t neckLogHandle, eyeLogHandle;
+        if(pthread_create(&neckLogHandle, NULL, ThreadLogFn, neckLogData) != 0) {
+            err = errno;
+            printf("Failed to start neck thread logging function with errno=%d\n", err);
+            neckLogData = NULL;
+            return;
+        }
+        if(pthread_join(neckLogHandle, NULL) != 0) {
+            err = errno;
+            printf("Failed to join neck logging thread with errno=%d\n", err);
+        }
+        neckLogData = NULL;
+
+        if(pthread_create(&eyeLogHandle, NULL, ThreadLogFn, eyeLogData) != 0) {
+            printf("Failed to start eye thread logging function with errno=%d\n", err);
+            eyeLogData = NULL;
+            return;
+        }
+        if(pthread_join(eyeLogHandle, NULL) != 0) {
+            err = errno;
+            printf("Failed to join eye logging thread with errno=%d\n", err);
+            return;
+        }
+        eyeLogData = NULL;
+}
+
 static void add_log_data(rawDataLog_t* log, double time, double data, uint8_t id)
 {
     log->entry[log->index].data = data;
     log->entry[log->index].time = time;
     log->entry[log->index].id   = id;
-    log->index = (++log->index < LOG_BUFLEN) ? log->index : 0;
+    log->index++;
 }
 
 void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
@@ -194,6 +265,7 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
     neckData.time = get_timestamp();
     double converted_data;
     uint8_t log_data_type;
+    int err;
     
     // Neck axis id 1-3
     if(axis_id > NUM_NECK_AXIS) {
@@ -239,7 +311,22 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             printf("Unknown neck data returned (reg=%x)\n", reg_addr);
             return;
     }
-    add_log_data(&neckLogData, neckData.time, converted_data, log_data_type*NUM_NECK_AXIS+axis_id-1);
+
+    if(neckLogData == NULL) {
+        neckLogData = (rawDataLog_t*)malloc(sizeof(rawDataLog_t));
+        strcpy(neckLogData->file, NECK_LOG_FILENAME);
+        neckLogData->index = 0;
+    }
+    add_log_data(neckLogData, neckData.time, converted_data, log_data_type*NUM_NECK_AXIS+axis_id-1);
+    if(neckLogData->index == LOG_BUFLEN) {
+        pthread_t logHandle;
+        if(pthread_create(&logHandle, NULL, ThreadLogFn, neckLogData) != 0) {
+            err = errno;
+            printf("Failed to start neck thread logging function with errno=%d\n", err);
+        }
+        neckLogData = NULL;
+    }
+
 }
 
 void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
@@ -247,6 +334,7 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
     double converted_data;
     uint8_t log_data_type;
     double time = get_timestamp();
+    int err;
     
     // Eye axis ids 1-4
     if(axis_id > NUM_EYE_AXIS) {
@@ -340,7 +428,21 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             // No logging, return instead
             return;
     }
-    add_log_data(&eyeLogData, time, converted_data, (log_data_type*NUM_EYE_AXIS)+axis_id-1);
+    
+    if(eyeLogData == NULL) {
+        eyeLogData = (rawDataLog_t*)malloc(sizeof(rawDataLog_t));
+        strcpy(eyeLogData->file, EYE_LOG_FILENAME);
+        eyeLogData->index = 0;
+    }
+    add_log_data(eyeLogData, time, converted_data, (log_data_type*NUM_EYE_AXIS)+axis_id-1);
+    if(eyeLogData->index == LOG_BUFLEN) {
+        pthread_t logHandle;
+        if(pthread_create(&logHandle, NULL, ThreadLogFn, eyeLogData) != 0) {
+            err = errno;
+            printf("Failed to start eye thread logging function with errno=%d\n", err);
+        }
+        eyeLogData = NULL;
+    }
 }
 
 static void parse_response_msg(devHandle_t* dev)
@@ -354,7 +456,7 @@ static void parse_response_msg(devHandle_t* dev)
         return;
     }
     
-    #ifdef DEBUG_RS232
+    #ifdef DEBUG_RX
         char frame_str[DBG_BUFF_SIZE];
         printf("recv: %s\n", get_msg_str(msg, frame_str));
     #endif
@@ -565,7 +667,7 @@ static uint16_t ConnectDev(devHandle_t* dev)
         printf("Recving conn resp %d....", i);
 #endif
         // Initialize receive buffer
-        memset(&dev->rx_buf, 0, BUFLEN);
+        memset(&dev->rx_buf, 0, sizeof(msg_t));
         if (ReceiveMessage(&dev->rx_buf, dev->fd) <= 0) {
             printf("Could not recv conn resp %u\n", i);
             return CONN_ERR;
@@ -620,7 +722,7 @@ static uint16_t DisconnectDev(devHandle_t* dev)
 #ifdef DEBUG_SHUTDOWN
     printf("Recving disconnect resp....");
 #endif
-    memset(&dev->rx_buf, 0, BUFLEN);
+    memset(&dev->rx_buf, 0, sizeof(msg_t));
     if (ReceiveMessage(&dev->rx_buf, dev->fd) <= 0) {
         printf("Could not recv disconnect response\n");
         return CONN_ERR;
@@ -701,6 +803,9 @@ static void ShutdownDev(devHandle_t* dev)
 
 static int StartDev(devHandle_t* dev)
 {
+    int err;
+    uint16_t conn_count = 0;
+
 #ifdef DEBUG_STARTUP
     printf("***Dev Settings***\n");
     printf("Local: %s:%d\n", dev->local_ip, dev->local_port);
@@ -722,7 +827,6 @@ static int StartDev(devHandle_t* dev)
 #ifdef DEBUG_STARTUP
     printf("configured\n");
 #endif
-    uint16_t conn_count = 0;
     while (conn_count < 5 && ConnectDev(dev) != CONN_OK) {
         conn_count++;
 #ifdef DEBUG_STARTUP
@@ -749,7 +853,8 @@ static int StartDev(devHandle_t* dev)
         // If we can talk with the drive, start the processing threads
         dev->runFlag = 1;
         if(pthread_create(&dev->rxThreadHandle, NULL, ThreadRxFunc, dev) != 0) {
-            printf("Failed to start dev rx thread\n");
+            err = errno;
+            printf("Failed to start dev rx thread with errno=%d\n", err);
             return -1;
         }
 #ifdef DEBUG_STARTUP
@@ -757,7 +862,8 @@ static int StartDev(devHandle_t* dev)
 #endif
         dev->rxThreadValid = true;
         if(pthread_create(&dev->txThreadHandle, NULL, ThreadTxFunc, dev) != 0) {
-            printf("Failed to start dev tx thread\n");
+            err = errno;
+            printf("Failed to start dev tx thread with errno=%d\n", err);
             return -1;
         }
 #ifdef DEBUG_STARTUP
@@ -785,8 +891,6 @@ static void AddCmd(devHandle_t* dev, msg_t* cmd)
 #ifdef DEBUG_TX
     //char frame_str[DBG_BUFF_SIZE];
     //printf("cmd: %s\n", get_msg_str(cmd, frame_str));
-    //printf("buf [%u]: %s\n", dev->cmd_produce_idx, get_msg_str(&(dev->cmd_buf[dev->cmd_produce_idx]), frame_str));
-    //printf("addr=%p\n", (void*)&(dev->cmd_buf[dev->cmd_produce_idx]));
 #endif
     dev->cmd_produce_idx = (dev->cmd_produce_idx + 1) % MAX_CMD_PEND;
 
@@ -849,6 +953,7 @@ void __attribute__ ((destructor)) Cleanup(void)
 {
     ShutdownDev(&eye);
     ShutdownDev(&neck);
+    FlushLogs();
 }
 
 eyeData_t* GetEyeData(void)

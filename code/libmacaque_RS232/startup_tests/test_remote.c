@@ -224,11 +224,13 @@ DWORD WINAPI EyeTxThread(LPVOID input)
         {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x04, 0x02, 0x30, 0x45, 0x67, 0x46}, .length = 10},
     };
 
-    for(int i = 0; i < NUM_EYE_TX_MSG; i++) {
-        int send_bytes = send(dev->cmd_fd, (const char*)var_cal_run[i].RS232_data, var_cal_run[i].length, 0);
-        if(send_bytes != var_cal_run[i].length) {
-            printf("Failed to send eye tx : %d\n", WSAGetLastError());
-            goto done_eye_tx;
+    for(int j = 0; j < 1000; j++) {
+        for(int i = 0; i < NUM_EYE_TX_MSG; i++) {
+            int send_bytes = send(dev->cmd_fd, (const char*)poserr_frame[i].RS232_data, poserr_frame[i].length, 0);
+            if(send_bytes != poserr_frame[i].length) {
+                printf("Failed to send eye tx : %d\n", WSAGetLastError());
+                goto done_eye_tx;
+            }
         }
     }
 
@@ -255,13 +257,16 @@ DWORD WINAPI NeckTxThread(LPVOID input)
         {.RS232_data = {0x08, 0x07, 0x81, 0xD4, 0x03, 0x02, 0x30, 0x34, 0x56, 0x23}, .length = 10},
     };
 
-    for(int i = 0; i < NUM_NECK_TX_MSG; i++) {
-        int send_bytes = send(dev->cmd_fd, (const char*)apos_frame[i].RS232_data, apos_frame[i].length, 0);
-        if(send_bytes != apos_frame[i].length) {
-            printf("Failed to send neck tx : %d\n", WSAGetLastError());
-            goto done_neck_tx;
+    for(int j = 0; j < 1000; j++) {
+        for(int i = 0; i < NUM_NECK_TX_MSG; i++) {
+            int send_bytes = send(dev->cmd_fd, (const char*)apos_frame[i].RS232_data, apos_frame[i].length, 0);
+            if(send_bytes != apos_frame[i].length) {
+                printf("Failed to send neck tx : %d\n", WSAGetLastError());
+                goto done_neck_tx;
+            }
         }
     }
+
     
     done_neck_tx:
     printf("Exiting neck tx thread\n");
