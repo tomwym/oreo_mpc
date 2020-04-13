@@ -262,7 +262,7 @@ static void add_log_data(rawDataLog_t* log, double time, double data, uint8_t id
 
 void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
 {
-    neckData.time = get_timestamp();
+    double time = get_timestamp();
     double converted_data;
     uint8_t log_data_type;
     int err;
@@ -272,7 +272,7 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
         printf("Neck data recvd from invalid axis id %d", axis_id);
         return;
     }
-
+    neckData.time = time;
     switch (reg_addr) {
         case REG_APOS:
             switch (axis_id) {
@@ -287,7 +287,10 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
                     printf("Unknown neck axis in APOS msg (axis=%d)\n", axis_id);
                     return;
             }
-            neckData.pos[axis_id-1] = converted_data;
+            pthread_mutex_lock(&neckData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
+            neckData.pos[AXISID_TO_DATAIDX(axis_id)].pos = converted_data;
+            neckData.pos[AXISID_TO_DATAIDX(axis_id)].time = time;
+            pthread_mutex_unlock(&neckData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
             log_data_type = NECK_POS;
             break;
 
@@ -304,9 +307,14 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
                     printf("Unknown neck axis in IQ msg (axis=%x)\n", axis_id);
                     return;
             }
-            neckData.torque[axis_id-1] = converted_data;
+            neckData.torque[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             log_data_type = NECK_TORQUE;
             break;
+
+        case VAR_CAL_READY:
+            neckData.ready[AXISID_TO_DATAIDX(axis_id)] = data;
+            // no logging needed return
+            return;
         default:
             printf("Unknown neck data returned (reg=%x)\n", reg_addr);
             return;
@@ -347,79 +355,50 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             log_data_type = EYE_HALL;
             converted_data = IU_TO_M*data;
             eyeCalData.time = time;
-            eyeCalData.pos[axis_id-1] = converted_data;
+            eyeCalData.pos[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_POSERR:
             log_data_type = EYE_POSERR;
             converted_data = IU_TO_M*data;
             eyeCalData.time = time;
-            eyeCalData.err[axis_id-1] = converted_data;
+            eyeCalData.err[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_TPOS:
             log_data_type = EYE_TARGET;
             converted_data = IU_TO_M*data;
             eyeCalData.time = time;
-            eyeCalData.tpos[axis_id-1] = converted_data;
+            eyeCalData.tpos[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_APOS2:
             log_data_type = EYE_ENCODER;
             eyeData.time = time;
             converted_data = IU_TO_RAD*data;
-            switch (axis_id) {
-                case EYE_YAW_LEFT_AXIS:
-                    eyeData.yaw[EYE_LEFT] = converted_data;
-                    break;
-                case EYE_YAW_RIGHT_AXIS:
-                    eyeData.yaw[EYE_RIGHT] = converted_data;
-                    break;
-                case EYE_PITCH_LEFT_AXIS:
-                    eyeData.pitch[EYE_LEFT] = converted_data;
-                    break;
-                case EYE_PITCH_RIGHT_AXIS:
-                    eyeData.pitch[EYE_RIGHT] = converted_data;
-                    break;
-                default:
-                    printf("Unknown eye axis in apos2 msg (axis=%x)\n", axis_id);
-                    return;
-            }
+             pthread_mutex_lock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
+            eyeData.pos[AXISID_TO_DATAIDX(axis_id)].pos = converted_data;
+            eyeData.pos[AXISID_TO_DATAIDX(axis_id)].time = time;
+            pthread_mutex_unlock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
             break;
         
         case REG_IQ:
             log_data_type = EYE_CURRENT;
             eyeData.time = time;
             converted_data = IU_TO_FORCE_EYE(data);
-            eyeData.torque[axis_id-1] = converted_data;
+            eyeData.torque[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case VAR_CAL_RUN:
-            eyeCalData.complete[axis_id-1] = data;
+            eyeCalData.complete[AXISID_TO_DATAIDX(axis_id)] = data;
             eyeCalData.time = time;
             // No logging, return instead
             return;
 
 	    case VAR_CAL_APOS2_OFF:
-            eyeData.time = time;
+            eyeCalData.time = time;
             converted_data = IU_TO_RAD*data;
-            switch (axis_id) {
-                case EYE_YAW_LEFT_AXIS:
-                    eyeData.yaw_offset[EYE_LEFT] = converted_data;
-                    break;
-                case EYE_YAW_RIGHT_AXIS:
-                    eyeData.yaw_offset[EYE_RIGHT] = converted_data;
-                    break;
-                case EYE_PITCH_LEFT_AXIS:
-                    eyeData.pitch_offset[EYE_LEFT] = converted_data;
-                    break;
-                case EYE_PITCH_RIGHT_AXIS:
-                    eyeData.pitch_offset[EYE_RIGHT] = converted_data;
-                    break;
-                default:
-                    printf("Unknown eye axis in apos2_offset msg (axis=%d)\n", axis_id);
-                    break;
-            }
+            eyeCalData.offset[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             // No logging, return instead
 	        return;
 
@@ -495,6 +474,7 @@ void* ThreadRxFunc(void* input)
         printf("Exiting rx thread for ip=%s\n", dev->dest_ip);
         pthread_exit(NULL);
     }
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
     while(dev->runFlag) {
         memset(&dev->rx_buf, 0, sizeof(msg_t));
@@ -594,6 +574,7 @@ void* ThreadTxFunc(void* input)
         printf("Exiting tx thread with dest=%s\n", dev->dest_ip);
         pthread_exit(NULL);
     }
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
     // Force sync
     dev->ack_pend = MAX_ACK_PEND;
@@ -880,12 +861,6 @@ static int StartDev(devHandle_t* dev)
 // Add command to the buffer
 static void AddCmd(devHandle_t* dev, msg_t* cmd)
 {
-    //struct timespec timeout = {.tv_sec = SEND_TIMEOUT_S, .tv_nsec = 0};
-
-    //if(sem_timedwait(&dev->buf_empty, &timeout) < 0) {
-    //    printf("Cmd buffer full\n");
-    //    return;
-    //}
     sem_wait(&dev->buf_empty);
     memcpy(&(dev->cmd_buf[dev->cmd_produce_idx]), cmd, sizeof(msg_t));
 #ifdef DEBUG_TX
@@ -910,7 +885,7 @@ void AddCmdNeck(msg_t* cmd)
 // Start the library
 void __attribute__ ((constructor)) Start(void)
 {
-    //int err; 
+    int err; 
     struct timespec currTime = {0,0};
     clock_gettime(CLOCK_MONOTONIC, &currTime);
     timebase = currTime.tv_sec*SECS_TO_NANO + currTime.tv_nsec;
@@ -929,6 +904,21 @@ void __attribute__ ((constructor)) Start(void)
     }*/
 
     InitLib(HOST_ID, BAUDRATE_115200);
+
+    // Initialize eyeData, neckData and eyeCalData mutexes
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+        if(pthread_mutex_init(&eyeData.pos[i].mutex, NULL) != 0) {
+            err = errno;
+            printf("Failed to init eye axis %d mutex with errno=%d\n", i+1);
+        }
+    }
+
+    for(int j = 0; j < NUM_NECK_AXIS; j++) {
+        if(pthread_mutex_init(&neckData.pos[j].mutex, NULL) != 0) {
+            err = errno;
+            printf("Failed to init neck axis %d mutex with errno=%d\n", j+1, err);
+        }
+    }
     
 #ifdef DEBUG_STARTUP
     // During tests, eye and neck need different ports
@@ -954,6 +944,23 @@ void __attribute__ ((destructor)) Cleanup(void)
     ShutdownDev(&eye);
     ShutdownDev(&neck);
     FlushLogs();
+
+    // Initialize eyeData, neckData and eyeCalData mutexes
+    int err;
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+       if(pthread_mutex_destroy(&eyeData.pos[i].mutex) != 0) {
+           err = errno;
+           printf("Failed to destroy eye axis %d mutex with errno=%d\n", i+1, err);
+           return;
+        }
+    }
+
+    for(int j = 0; j < NUM_NECK_AXIS; j++) {
+        if(pthread_mutex_destroy(&neckData.pos[j].mutex) != 0) {
+            err = errno;
+            printf("Failed to destroy neck axis %d mutex with errno=%d", j+1, err);
+        }
+    }
 }
 
 eyeData_t* GetEyeData(void)

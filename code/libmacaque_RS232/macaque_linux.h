@@ -2,6 +2,7 @@
 #define MACAQUE_LINUX_H
 
 #include <stdint.h>
+#include <pthread.h>
 #include "../sock_interface/sock.h"
 
 #define SHUTDOWN_TIMEOUT_MS 	    (2000)
@@ -67,13 +68,18 @@ typedef enum {
 
 typedef RS232_MSG msg_t;
 
-// Eye drive defines
+// Helpers to transfer between axis id and data array idx
+#define AXISID_TO_DATAIDX(id)       (id-1)
+#define DATAIDX_TO_AXISID(idx)      (idx+1)
+
+// For accessing arra
 typedef enum {
-    EYE_LEFT,
-    EYE_RIGHT,
-    NUM_EYES,
-    NUM_EYE_AXIS = (NUM_EYES*2),
-} eye_idx_t;
+    EYE_YAW_LEFT_IDX,
+    EYE_YAW_RIGHT_IDX,
+    EYE_PITCH_LEFT_IDX,
+    EYE_PITCH_RIGHT_IDX,
+    NUM_EYE_AXIS,
+} eye_data_idx_t;
 
 // Axis id mapping
 typedef enum {
@@ -85,10 +91,10 @@ typedef enum {
 
 // Log data id
 typedef enum {
-    EYE_YAW_LEFT,
-    EYE_PITCH_LEFT,
-    EYE_YAW_RIGHT,
-    EYE_PITCH_RIGHT,
+    EYE_YAW_LEFT_OFFSET,
+    EYE_PITCH_LEFT_OFFSET,
+    EYE_YAW_RIGHT_OFFSET,
+    EYE_PITCH_RIGHT_OFFSET,
     EYE_LEFT_LEFT_POS,
     EYE_LEFT_RIGHT_POS,
     EYE_RIGHT_LEFT_POS,
@@ -116,13 +122,20 @@ typedef enum {
 } eye_log_data_types_t;
 
 // Neck drive defines
-//axis id mapping
+// Neck axis id mapping
 typedef enum {
     NECK_YAW_AXIS = 1,
     NECK_PITCH_AXIS,
     NECK_ROLL_AXIS,
-    NUM_NECK_AXIS = NECK_ROLL_AXIS,
 } neck_drive_t;
+
+// For accessing torque/pos arrays in neck data
+typedef enum {
+    NECK_YAW_AXIS_IDX,
+    NECK_PITCH_AXIS_IDX,
+    NECK_ROLL_AXIS_IDX,
+    NUM_NECK_AXIS,
+} neck_data_idx_t;
 
 // Log data id
 typedef enum {
@@ -144,29 +157,35 @@ typedef enum {
 typedef enum {
     CAL_COMPLETE,
     CAL_RUNNING,
-} cal_states_t;
+} eye_cal_states_t;
+
+// Position struct for pid
+typedef struct _pos_t{
+    double pos;
+    double time;
+    pthread_mutex_t mutex;
+} pos_t;
 
 typedef struct eyeCalData {
     double time;
     double pos[NUM_EYE_AXIS];
     double err[NUM_EYE_AXIS];
     double tpos[NUM_EYE_AXIS];
+    double offset[NUM_EYE_AXIS];
     uint16_t complete[NUM_EYE_AXIS];
 } eyeCalData_t;
 
 typedef struct eyeData {
     double time;
-    double yaw[NUM_EYES];
-    double yaw_offset[NUM_EYES];
-    double pitch[NUM_EYES];
-    double pitch_offset[NUM_EYES];
+    pos_t pos[NUM_EYE_AXIS];
     double torque[NUM_EYE_AXIS];
 } eyeData_t;
 
 typedef struct neckData {
     double time;
-    double pos[NUM_NECK_AXIS];
+    pos_t pos[NUM_NECK_AXIS];
     double torque[NUM_NECK_AXIS];
+    uint16_t ready[NUM_NECK_AXIS];
 } neckData_t;
 
 /* neck controller functions */

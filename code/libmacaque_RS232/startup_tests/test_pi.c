@@ -37,6 +37,11 @@ void PrintEyeCal()
         printf(" %.3d", eyeCal->complete[i]);
     }
     printf("\n");
+        printf("offset:");
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+        printf(" %.3f", eyeCal->offset[i]);
+    }
+    printf("\n");
     printf("****Eye Cal Data****\n");
 }
 
@@ -45,24 +50,14 @@ void PrintEyeData()
     eyeData_t* eyeData = GetEyeData();
     printf("\n****Eye Data****\n");
     printf("time: %.3f\n", eyeData->time);
-    printf("yaw:");
-    for(int i = 0; i < NUM_EYES; i++) {
-        printf(" %.3f", eyeData->yaw[i]);
+    printf("pos_time:");
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+        printf(" %.3f", eyeData->pos[i].time);
     }
     printf("\n");
-    printf("yaw_offset:");
-    for(int i = 0; i < NUM_EYES; i++) {
-        printf(" %.3f", eyeData->yaw_offset[i]);
-    }
-    printf("\n");
-    printf("pitch:");
-    for(int i = 0; i < NUM_EYES; i++) {
-        printf(" %.3f", eyeData->pitch[i]);
-    }
-    printf("\n");
-    printf("pitch_offset:");
-    for(int i = 0; i < NUM_EYES; i++) {
-        printf(" %.3f", eyeData->pitch_offset[i]);
+    printf("pos:");
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+        printf(" %.3f", eyeData->pos[i].pos);
     }
     printf("\n");
     printf("torque: ");
@@ -78,9 +73,14 @@ void PrintNeckData()
     neckData_t* neckData = GetNeckData();
     printf("\n****Neck Data****\n");
     printf("time:   %.3f\n", neckData->time);
+    printf("pos_time: ");
+    for(int i = 0; i < NUM_NECK_AXIS; i++) {
+        printf(" %.3f", neckData->pos[i].time);
+    }
+    printf("\n");
     printf("pos: ");
     for(int i = 0; i < NUM_NECK_AXIS; i++) {
-        printf(" %.3f", neckData->pos[i]);
+        printf(" %.3f", neckData->pos[i].pos);
     }
     printf("\n");
     printf("torque:");
@@ -104,7 +104,7 @@ int main()
             PrintEyeCal();
             PrintEyeData();
             PrintNeckData();
-            //break;
+            break;
         }
     };  
 }
