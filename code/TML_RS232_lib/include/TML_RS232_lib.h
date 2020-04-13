@@ -19,6 +19,7 @@
 #define VAR_CAL_RUN           (uint16_t)(0x03B3u)   // int
 #define VAR_CAL_CUR           (uint16_t)(0x03B2u)   // int
 #define VAR_CAL_APOS2_OFF     (uint16_t)(0x03B0u)   // long
+#define VAR_CAL_READY         (uint16_t)(0x03B0u)   // int (neck)
 
 // Common instruction pointer addresses
 #define POSN_LOOP_EYE_IP		0x4025u     // Motion(eye) loop
