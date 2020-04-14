@@ -226,8 +226,8 @@ DWORD WINAPI EyeTxThread(LPVOID input)
 
     for(int j = 0; j < 1000; j++) {
         for(int i = 0; i < NUM_EYE_TX_MSG; i++) {
-            int send_bytes = send(dev->cmd_fd, (const char*)poserr_frame[i].RS232_data, poserr_frame[i].length, 0);
-            if(send_bytes != poserr_frame[i].length) {
+            int send_bytes = send(dev->cmd_fd, (const char*)apos2_frame[i].RS232_data, apos2_frame[i].length, 0);
+            if(send_bytes != apos2_frame[i].length) {
                 printf("Failed to send eye tx : %d\n", WSAGetLastError());
                 goto done_eye_tx;
             }

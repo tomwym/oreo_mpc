@@ -3,19 +3,17 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
-#define __USE_POSIX199309
-#include <time.h>
 #include <time.h>
 
 #include "pid.h"
 #include "libmacaque_RS232/macaque_linux.h"
 
-static double get_timestamp()
+/*static double get_timestamp()
 {
     struct timespec curr;
     clock_gettime(CLOCK_MONOTONIC, &curr);
     return (double)curr.tv_sec + (double)curr.tv_nsec/(1000*1000*1000);
-}
+}*/
 
 void StartMotion(pid_loop_t* loop, double initTime)
 {
@@ -53,10 +51,10 @@ double UpdateLoop(pid_loop_t* loop, double pos, double time)
 
     // Prevent robots from slamming at limits
     if(pos > loop->param.pos_lim.high && cmd > 0) {
-        printf("Pos posn lim reached pos=%d\n", pos);
+        printf("Pos posn lim reached pos=%.3f\n", pos);
         cmd = 0;
     } else if(pos > loop->param.pos_lim.low && cmd < 0) {
-        printf("Neg posn limit reached pos=%d\n", pos);
+        printf("Neg posn limit reached pos=%.3f\n", pos);
         cmd = 0;
     }
     

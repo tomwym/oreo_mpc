@@ -909,7 +909,7 @@ void __attribute__ ((constructor)) Start(void)
     for(int i = 0; i < NUM_EYE_AXIS; i++) {
         if(pthread_mutex_init(&eyeData.pos[i].mutex, NULL) != 0) {
             err = errno;
-            printf("Failed to init eye axis %d mutex with errno=%d\n", i+1);
+            printf("Failed to init eye axis %d mutex with errno=%d\n", i+1, err);
         }
     }
 
