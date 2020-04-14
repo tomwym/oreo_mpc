@@ -72,7 +72,7 @@ typedef RS232_MSG msg_t;
 #define AXISID_TO_DATAIDX(id)       (id-1)
 #define DATAIDX_TO_AXISID(idx)      (idx+1)
 
-// For accessing arra
+// For accessing eye pos/torque array
 typedef enum {
     EYE_YAW_LEFT_IDX,
     EYE_YAW_RIGHT_IDX,
@@ -81,12 +81,12 @@ typedef enum {
     NUM_EYE_AXIS,
 } eye_data_idx_t;
 
-// Axis id mapping
+// Axis id mapping ()
 typedef enum {
-    EYE_YAW_LEFT_AXIS = 1,
-    EYE_YAW_RIGHT_AXIS,
-    EYE_PITCH_LEFT_AXIS,
-    EYE_PITCH_RIGHT_AXIS,
+    LEFT_EYE_LEFT_AXIS = 1,
+    LEFT_EYE_RIGHT_AXIS,
+    RIGHT_EYE_LEFT_AXIS,
+    RIGHT_EYE_RIGHT_AXIS,
 } eye_axis_t;
 
 // Log data id

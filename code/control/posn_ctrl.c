@@ -46,22 +46,22 @@ static pid_loop_t pid_neck_roll = {
     .errSum = 0, .prevErr = 0, .target = 0, .prevTime = 0
 };
 
-static pid_loop_t pid_eye_yaw_left = {
+static pid_loop_t pid_left_eye_left = {
     .param = {.kp = 0, .ki = 0, .kd = 0, .integ_lim = INTEG_LIM, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .target = 0, .prevTime = 0
 };
 
-static pid_loop_t pid_eye_yaw_right = {
+static pid_loop_t pid_left_eye_right = {
     .param = {.kp = 0, .ki = 0, .kd = 0, .integ_lim = INTEG_LIM, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .target = 0, .prevTime = 0
 };
 
-static pid_loop_t pid_eye_pitch_left = {
+static pid_loop_t pid_right_eye_left = {
     .param = {.kp = 0, .ki = 0, .kd = 0, .integ_lim = INTEG_LIM, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .target = 0, .prevTime = 0
 };
 
-static pid_loop_t pid_eye_pitch_right = {
+static pid_loop_t pid_right_eye_right = {
     .param = {.kp = 0, .ki = 0, .kd = 0, .integ_lim = INTEG_LIM, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .target = 0, .prevTime = 0
 };
@@ -78,22 +78,22 @@ typedef struct {
 
 static motor_ctrl_t neck_ctrl[NUM_NECK_AXIS] = {
     {.pid_loop = &pid_neck_yaw, .feedback = NULL, .pos_offset = 0,
-        .callback = &SetNeckTorque, .axis_id = NECK_YAW_AXIS, .name = "Neck Yaw"},
+        .callback = &SetNeckTorque, .axis_id = NECK_YAW_AXIS, .name = "Neck Yaw Axis"},
     {.pid_loop = &pid_neck_pitch, .feedback = NULL, .pos_offset = 0, 
-        .callback = &SetNeckTorque, .axis_id = NECK_PITCH_AXIS, .name = "Neck Pitch"},
+        .callback = &SetNeckTorque, .axis_id = NECK_PITCH_AXIS, .name = "Neck Pitch Axis"},
     {.pid_loop = &pid_neck_roll, .feedback = NULL, .pos_offset = 0, 
-        .callback = &SetNeckTorque, .axis_id = NECK_ROLL_AXIS, .name = "Neck Roll"},
+        .callback = &SetNeckTorque, .axis_id = NECK_ROLL_AXIS, .name = "Neck Roll Axis"},
 };
 
 static motor_ctrl_t eye_ctrl[NUM_EYE_AXIS] = {
-    {.pid_loop = &pid_eye_yaw_left, .feedback = NULL, .pos_offset = 0,
-        .callback = &SetEyeForce, .axis_id = EYE_YAW_LEFT_AXIS, .name = "Eye Yaw Left"},
-    {.pid_loop = &pid_eye_yaw_right, .feedback = NULL, .pos_offset = 0,
-        .callback = &SetEyeForce, .axis_id = EYE_YAW_RIGHT_AXIS, .name = "Eye Yaw Right"},
-    {.pid_loop = &pid_eye_pitch_left, .feedback = NULL, .pos_offset = 0,
-        .callback = &SetEyeForce, .axis_id = EYE_PITCH_LEFT_AXIS, .name = "Eye Pitch Left"},
-    {.pid_loop = &pid_eye_pitch_right, .feedback = NULL, .pos_offset = 0,
-        .callback = &SetEyeForce, .axis_id = EYE_PITCH_RIGHT_AXIS, .name = "Eye Pitch Right"},
+    {.pid_loop = &pid_left_eye_left, .feedback = NULL, .pos_offset = 0,
+        .callback = &SetEyeForce, .axis_id = LEFT_EYE_LEFT_AXIS, .name = "Left Eye Left Axis"},
+    {.pid_loop = &pid_left_eye_right, .feedback = NULL, .pos_offset = 0,
+        .callback = &SetEyeForce, .axis_id = LEFT_EYE_RIGHT_AXIS, .name = "Left Eye Right Axis"},
+    {.pid_loop = &pid_right_eye_left, .feedback = NULL, .pos_offset = 0,
+        .callback = &SetEyeForce, .axis_id = RIGHT_EYE_LEFT_AXIS, .name = "Right Eye Left Axis"},
+    {.pid_loop = &pid_right_eye_right, .feedback = NULL, .pos_offset = 0,
+        .callback = &SetEyeForce, .axis_id = RIGHT_EYE_RIGHT_AXIS, .name = "Right Eye Right Axis"},
 };
 
 void* ControlLoop(void* input)
@@ -151,10 +151,13 @@ static void print_cmd_menu()
 static void print_eye_menu()
 {
     printf("\n****EYE MOTOR MENU****\n");
-    printf("[1] eye_yaw_left\n");
-    printf("[2] eye_yaw_right\n");
-    printf("[3] eye_pitch_left\n");
-    printf("[4] eye_pitch_right\n");
+    /*printf("[1] left_eye_left_axis\n");
+    printf("[2] eye_yaw_right_axis\n");
+    printf("[3] eye_pitch_left_axis\n");
+    printf("[4] eye_pitch_right_axis\n");*/
+    for(int i = 0; i < NUM_EYE_AXIS; i++) {
+        printf("[%d] %s\n", eye_ctrl[i].axis_id, eye_ctrl[i].name);
+    }
     printf("[q] back to main\n");
     printf("****EYE MOTOR MENU****\n");
 }
@@ -162,9 +165,12 @@ static void print_eye_menu()
 static void print_neck_menu()
 {
     printf("\n****NECK MOTOR MENU****\n");
-    printf("[1] neck_yaw\n");
+    /*printf("[1] neck_yaw\n");
     printf("[2] neck_pitch\n");
-    printf("[3] neck_roll\n");
+    printf("[3] neck_roll\n");*/
+    for(int i = 0; i < NUM_NECK_AXIS; i++) {
+        printf("[%d] %s\n", neck_ctrl[i].axis_id, neck_ctrl[i].name);
+    }
     printf("[q] back to main\n");
     printf("****NECK MOTOR MENU****\n");
 }

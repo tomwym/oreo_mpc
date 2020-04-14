@@ -1,5 +1,5 @@
-#ifndef TML_RS232_LIB_H
-#define TML_RS232_LIB_H
+#ifndef PID_H
+#define PID_H
 #include <stdint.h>
 #include <stdbool.h>
 #include "libmacaque_RS232/macaque_linux.h"

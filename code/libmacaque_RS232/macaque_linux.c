@@ -376,7 +376,7 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             log_data_type = EYE_ENCODER;
             eyeData.time = time;
             converted_data = IU_TO_RAD*data;
-             pthread_mutex_lock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
+            pthread_mutex_lock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
             eyeData.pos[AXISID_TO_DATAIDX(axis_id)].pos = converted_data;
             eyeData.pos[AXISID_TO_DATAIDX(axis_id)].time = time;
             pthread_mutex_unlock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
