@@ -15,7 +15,7 @@
 #define GET_ID(code)            (uint8_t)(code >> 4)
 
 static uint8_t hostId = 0;
-static uint16_t baudRate = BAUDRATE_115200;
+static uint16_t baudRate = BAUDRATE_1000K;
 
 // Perform checksum
 // msg_bytes is # bytes in msg - checksum
@@ -91,7 +91,7 @@ static void FormatCommand(dest_dev_t dev, motor_id_t* dest, uint16_t optCode, vo
 }
 
 // Set var which holds id recognized as host on the network
-void InitLib(uint8_t id, serial_baudrate_t rate)
+void InitLib(uint8_t id, baudrate_t rate)
 {
     hostId = id;
     baudRate = rate;
@@ -366,7 +366,7 @@ void SendPing(dest_dev_t dev, motor_id_t* dest)
     uint16_t optCode = OPT_PING;
     uint16_t masterId = HOST_TO_MASTER(hostId);
     // Scale latency based on baudrate
-    uint16_t latency = PING_LATENCY_115200 * (BAUDRATE_115200 - baudRate)*2;
+    uint16_t latency = PING_LATENCY_115200 * (BAUDRATE_1000K - baudRate)*2;
     uint32_t payload = ADD_WORDS(latency, masterId);
     FormatCommand(dev, dest, optCode, &payload, sizeof(payload)/2);
 }
@@ -394,7 +394,7 @@ int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE])
 
 // Immediately update position with stored parameters
 // For broadcast message, set as group, id = 0
-void UpdatePosn(dest_dev_t dev, motor_id_t* dest)
+void UpdateMotion(dest_dev_t dev, motor_id_t* dest)
 {
     uint16_t optCode = OPT_UPD;
     FormatCommand(dev, dest, optCode, NULL, 0);
@@ -411,9 +411,9 @@ void SetSync(dest_dev_t dev, motor_id_t* dest)
 }
 
 // Set serial baud rate
-void SetBaudRate(dest_dev_t dev, serial_baudrate_t rate)
+void SetBaudRate(dest_dev_t dev, baudrate_t rate)
 {
-    uint16_t optCode = OPT_SCIBR;
+    uint16_t optCode = OPT_CANBR;
     baudRate = rate;
     motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
     FormatCommand(dev, &dest, optCode, &rate, sizeof(baudRate)/2);
@@ -442,4 +442,10 @@ void SetExtRefAnalog(dest_dev_t dev, motor_id_t* dest)
 void SetExtRefDigital(dest_dev_t dev, motor_id_t* dest)
 {
     SetExtRefMode(dev, dest, EXTREF_DIGITAL_PAYLOAD);
+}
+
+// Reset all faults on motors
+void ResetFaults(dest_dev_t dev, motor_id_t* dest)
+{
+    FormatCommand(dev, dest, OPT_FAULTR, NULL, 0);
 }

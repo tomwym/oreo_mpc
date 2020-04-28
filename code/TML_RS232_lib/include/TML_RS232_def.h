@@ -39,12 +39,13 @@
 #define OPT_POSREF           (uint16_t)(0x5909u)
 #define CPR_PAYLOAD          (uint32_t)(0x0000DFFFu)
 #define CPA_PAYLOAD          (uint32_t)(0x2000FFFFu)
-#define OPT_SCIBR            (uint16_t)(0x0820u)
+#define OPT_CANBR            (uint16_t)(0x0804u)
 #define OPT_PING             (uint16_t)(0xD600u)
 #define OPT_PONG             (uint16_t)(0xD600u)
 #define OPT_UPD              (uint16_t)(0x0108u)
 #define OPT_SETSYNC          (uint16_t)(0x1404u)
 #define OPT_EXTREF           (uint16_t)(0x5909u)
+#define OPT_FAULTR           (uint16_t)(0x1C04u)
 
 // Motion Modes
 #define MODE_PP_PAYLOAD      (uint32_t)(0x8701BFC1u)

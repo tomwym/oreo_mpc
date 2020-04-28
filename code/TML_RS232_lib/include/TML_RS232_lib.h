@@ -10,12 +10,16 @@
 #define REG_CSPD              (uint16_t)(0x02A0u)   // fixed (32bits)
 #define REG_APOS              (uint16_t)(0x0228u)   // long
 #define REG_APOS2             (uint16_t)(0x081Cu)   // long
+#define REG_APOS2_2           (uint16_t)(0x001Cu)   // long
 #define REG_TPOS              (uint16_t)(0x02B2u)   // long
 #define REG_MASTERID          (uint16_t)(0x0927u)   // int
 #define REG_POSERR            (uint16_t)(0x022Au)   // int
 #define REG_EREFT             (uint16_t)(0x02A9u)   // int
 #define REG_IQREF             (uint16_t)(0x022Fu)   // int
 #define REG_IQ                (uint16_t)(0x0230u)   // int
+#define REG_CSR               (uint16_t)(0x030Bu)   // 16bit
+#define REG_CER               (uint16_t)(0x0301u)   // 16bit
+#define REG_CBR               (uint16_t)(0x030Du)   // 16bit
 #define VAR_CAL_RUN           (uint16_t)(0x03B3u)   // int
 #define VAR_CAL_CUR           (uint16_t)(0x03B2u)   // int
 #define VAR_CAL_APOS2_OFF     (uint16_t)(0x03B0u)   // long
@@ -25,9 +29,9 @@
 #define POSN_LOOP_EYE_IP		0x4025u     // Motion(eye) loop
 #define WAIT_LOOP_EYE_IP		0x401Eu     // Wait(eye) loop
 #define FORCE_LOOP_EYE_IP       0x402Au     // Torque control loop
-#define POSN_LOOP_NECK_IP	    0x403Bu     // Motion(neck) loop
-#define WAIT_LOOP_NECK_IP	    0x4034u     // Wait(neck) loop
-#define TORQUE_LOOP_NECK_IP     0xFFFFu     // Torque control loop
+#define POSN_LOOP_NECK_IP	    0x4043u     // Motion(neck) loop
+#define WAIT_LOOP_NECK_IP	    0x403Cu     // Wait(neck) loop
+#define TORQUE_LOOP_NECK_IP     0x4048u     // Torque control loop
 #define REV_CAL_EYE_IP          0x4069u     // Reverse calibration
 #define FOR_CAL_EYE_IP	        0x402Fu     // Forward calibration
 
@@ -46,14 +50,14 @@ typedef struct {
 
 #define VERSION_SIZE          (4)
 
-// enum for CAN baudrates
+// enum for serial baudrates
 typedef enum {
-    BAUDRATE_9600,
-    BAUDRATE_19200,
-    BAUDRATE_38400,
-    BAUDRATE_56600,
-    BAUDRATE_115200,
-} serial_baudrate_t;
+    BAUDRATE_125K = 0xF36C,
+    BAUDRATE_250K = 0x736C,
+    BAUDRATE_500K = 0x3273,
+    BAUDRATE_800K = 0x412A,
+    BAUDRATE_1000K = 0x1273,
+} baudrate_t;
 
 // enum for external reference types
 typedef enum {
@@ -69,7 +73,7 @@ typedef enum {
 } dest_dev_t;
 
 // Holds the id recognized as host on the network
-void InitLib(uint8_t id, serial_baudrate_t rate);
+void InitLib(uint8_t id, baudrate_t rate);
 
 // Function to parse response from drive
 int8_t ParseResponse(RS232_MSG* frame, uint32_t* data, uint8_t* axis, uint16_t* reg_addr);
@@ -137,7 +141,7 @@ int8_t ParsePong(RS232_MSG* frame, uint8_t* axis, char version[VERSION_SIZE]);
 
 // Immediately update position with stored parameters
 // For broadcast message, set as group, id = 0
-void UpdatePosn(dest_dev_t dev, motor_id_t* dest);
+void UpdateMotion(dest_dev_t dev, motor_id_t* dest);
 
 // Enable control-loop sync messages on axes
 // Period sets time-between sync messages
@@ -145,7 +149,7 @@ void UpdatePosn(dest_dev_t dev, motor_id_t* dest);
 void SetSync(dest_dev_t dev, motor_id_t* id);
 
 // Set serial baud rate
-void SetBaudRate(dest_dev_t dev, serial_baudrate_t rate);
+void SetBaudRate(dest_dev_t dev, baudrate_t rate);
 
 // Set external reference mode
 void SetExtRefMode(dest_dev_t dev, motor_id_t* dest, uint32_t mode);
@@ -158,4 +162,7 @@ void SetExtRefAnalog(dest_dev_t dev, motor_id_t* dest);
 
 // Set external reference mode to digital (use digital input)
 void SetExtRefDigital(dest_dev_t dev, motor_id_t* dest);
+
+// Reset all faults on motors
+void ResetFaults(dest_dev_t dev, motor_id_t* dest);
 #endif
