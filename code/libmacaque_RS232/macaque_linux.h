@@ -14,7 +14,7 @@
 #define EYE_LOG_FILENAME            ("./eye_log.csv")
 #define NECK_LOG_FILENAME           ("./neck_log.csv")
 #define MAX_ACK_PEND 		        (8)  //limit how much we pound the drives with polls for data
-#define MAX_CMD_PEND 		        (uint8_t)(16)  //must be a power of 2
+#define MAX_CMD_PEND 		        (uint8_t)(8)  //must be a power of 2
 
 #define CONN_MSG1		            ((uint8_t[]){0x01,0xA4,0x06})
 #define CONN_RESP1		            ((uint8_t)0x02)
@@ -26,7 +26,7 @@
 #define CONN_RESP4      	        ((uint8_t)0x04)
 #define NUM_CONN_MSG                (4)
 #define CONN_SYNC_RESP		        (0x0Du)
-#define CONN_SYNC_RESP_BYTES        (1)
+#define CONN_SYNC_RESP_BYTES        (15)
 #define CONN_SYNC_BYTES		        (15)
 #define CONN_SYNC   		        (0xFFu)
 #define DISCONN_MSG		            ((uint8_t[]){0x05})
@@ -39,7 +39,7 @@ typedef enum {
     CONN_SYNC_ERR,
 } conn_state_t;
 
-#define STARTUP_TEST
+//#define STARTUP_TEST
 #ifndef STARTUP_TEST
 #define HOST_ID                     (120)
 #define LOCAL_IP                    ("192.168.2.8")
@@ -72,21 +72,29 @@ typedef RS232_MSG msg_t;
 #define AXISID_TO_DATAIDX(id)       (id-1)
 #define DATAIDX_TO_AXISID(idx)      (idx+1)
 
-// For accessing eye pos/torque array
+// For accessing eyeData pos array
 typedef enum {
-    EYE_YAW_LEFT_IDX,
-    EYE_YAW_RIGHT_IDX,
-    EYE_PITCH_LEFT_IDX,
-    EYE_PITCH_RIGHT_IDX,
+    RIGHT_EYE_YAW_IDX,
+    RIGHT_EYE_PITCH_IDX,
+    LEFT_EYE_PITCH_IDX,
+    LEFT_EYE_YAW_IDX,
     NUM_EYE_AXIS,
+} eye_pos_data_idx_t;
+
+// For accessing eyeCalData and eyeData torque array
+typedef enum {
+    LEFT_EYE_LEFT_AXIS_IDX,
+    LEFT_EYE_RIGHT_AXIS_IDX,
+    RIGHT_EYE_LEFT_AXIS_IDX,
+    RIGHT_EYE_RIGHT_AXIS_IDX,
 } eye_data_idx_t;
 
-// Axis id mapping ()
+// Axis id mapping () -> directions from behind head
 typedef enum {
-    LEFT_EYE_LEFT_AXIS = 1,
-    LEFT_EYE_RIGHT_AXIS,
+    RIGHT_EYE_RIGHT_AXIS = 1,
     RIGHT_EYE_LEFT_AXIS,
-    RIGHT_EYE_RIGHT_AXIS,
+    LEFT_EYE_RIGHT_AXIS,
+    LEFT_EYE_LEFT_AXIS,
 } eye_axis_t;
 
 // Log data id
@@ -168,17 +176,17 @@ typedef struct _pos_t{
 
 typedef struct eyeCalData {
     double time;
-    double pos[NUM_EYE_AXIS];
-    double err[NUM_EYE_AXIS];
-    double tpos[NUM_EYE_AXIS];
-    double offset[NUM_EYE_AXIS];
-    uint16_t complete[NUM_EYE_AXIS];
+    double pos[NUM_EYE_AXIS]; // see eye_data_idx_t for idx ordering 
+    double err[NUM_EYE_AXIS]; // see eye_data_idx_t for idx ordering
+    double tpos[NUM_EYE_AXIS]; // see eye_data_idx_t for idx ordering
+    uint16_t complete[NUM_EYE_AXIS]; // see eye_data_idx_t for idx ordering
 } eyeCalData_t;
 
 typedef struct eyeData {
     double time;
-    pos_t pos[NUM_EYE_AXIS];
-    double torque[NUM_EYE_AXIS];
+    pos_t pos[NUM_EYE_AXIS]; // see eye_pos_data_idx_t for idx ordering
+    double offset[NUM_EYE_AXIS]; // see eye_pos_data_idx_t for idx ordering
+    double force[NUM_EYE_AXIS]; // see eye_data_idx_t for idx ordering
 } eyeData_t;
 
 typedef struct neckData {
@@ -192,13 +200,15 @@ typedef struct neckData {
 // Get some data
 neckData_t* GetNeckData(void);
 // Position Control
+void InitNeckPosnCtrl();
 void DisableNeckCtrl(void);
+// Set axis = 0 for broadcast
 void SetNeckPosn(uint8_t axis, double pos_rad);
 void SetNeckSpeed(uint8_t axis, double speed_rps);
 void SetNeckAccel(uint8_t axis, double accel_rpss);
-void UpdateNeckPos();
+void UpdateNeck(uint8_t axis);
 // Torque Control
-void InitNeckTorqueCtrl();
+void InitNeckTorqueCtrl(uint8_t axis);
 void SetNeckTorque(uint8_t axis, double torque_nm);
 /* neck controller function */
 
@@ -209,13 +219,15 @@ eyeData_t* GetEyeData(void);
 eyeCalData_t* GetEyeCalData(void);
 void StartEyeCal(uint8_t axis, double pos_m);
 // Position control
+void InitEyePosnCtrl(void);
 void DisableEyeCtrl(void);
+// Set axis = 0 for broadcast
 void SetEyePosn(uint8_t axis, double pos_m);
 void SetEyeSpeed(uint8_t axis, double speed_mps);
 void SetEyeAccel(uint8_t axis, double accel_mpss);
-void UpdateEyePos();
+void UpdateEye(uint8_t axis);
 // Torque control
-void InitEyeForceCtrl();
+void InitEyeForceCtrl(uint8_t axis);
 void SetEyeForce(uint8_t axis, double force_n);
 /* eye controller functions */
 

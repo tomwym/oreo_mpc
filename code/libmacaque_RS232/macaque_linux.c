@@ -33,6 +33,8 @@
 #ifndef M_PI
     #define M_PI                        ((double)3.14159265358979323846)
 #endif
+
+// Eye unit conversions
 #define COUNTS_PER_POLE	            (double)(2048)
 #define METERS_PER_POLE             (double)(0.018)
 #define PEAK_CURR_EYE               (double)(1.6)   // amps
@@ -44,11 +46,12 @@
 #define SPEED_IU_TO_MPS		        (double)(1.0 / MPS_TO_SPEED_IU)
 #define MPSS_TO_ACCEL_IU		    (double)(SAMPLE_PERIOD_EYE_S * SAMPLE_PERIOD_EYE_S * M_TO_IU)
 #define ACCEL_IU_TO_MPSS		    (double)(1.0 / MPSS_TO_ACCEL_IU)
-#define CURR_IU_TO_AMPS_EYE         (double)((2.0*PEAK_CURR_EYE)/6552.0)
+#define CURR_IU_TO_AMPS_EYE         (double)((2.0*PEAK_CURR_EYE)/65520.0)
 #define AMPS_TO_CURR_IU_EYE         (double)(1.0/CURR_IU_TO_AMPS_EYE)
 #define IU_TO_FORCE_EYE(iu)         (double)(iu*MOTOR_CONST_EYE*CURR_IU_TO_AMPS_EYE)
-#define FORCE_TO_IU_EYE(f)          (int16_t)(f*(1.0/MOTOR_CONST_EYE)*AMPS_TO_CURR_IU_EYE)
+#define FORCE_TO_IU_EYE(f)          (int16_t)((double)f/MOTOR_CONST_EYE*AMPS_TO_CURR_IU_EYE)
 
+// Neck unit conversion
 #define COUNTS_PER_REV 	            (double)(5000)
 #define COUNTS_PER_REV_YAW 	        (double)(16*86)
 #define SAMPLE_PERIOD_NECK_S	    (double)(0.001)
@@ -66,25 +69,34 @@
 #define SPEED_IU_TO_RADPS_YAW       (double)(1.0 / RADPS_TO_SPEED_IU_YAW)
 
 #define PEAK_CURR_NECK              (double)(0.75)  // amps
-#define AMPS_TO_CURR_IU_NECK        (double)(65472.0/(2.0*PEAK_CURR_NECK))
-#define CURR_IU_TO_AMPS_NECK        (double)(1.0/AMPS_TO_CURR_IU_NECK)
+#define CURR_IU_TO_AMPS_NECK        (double)((2.0*PEAK_CURR_NECK)/65472.0)
+#define AMPS_TO_CURR_IU_NECK        (double)(1.0/CURR_IU_TO_AMPS_NECK)
 #define MOTOR_CONST_NECK            (double)(1.175) // Nm/A
 #define MOTOR_CONST_NECK_YAW        (double)(0.0261) // Nm/A
-#define TORQUE_TO_IU_NECK(t)        (int16_t)(t*(1.0/MOTOR_CONST_NECK)*AMPS_TO_CURR_IU_NECK)
-#define TORQUE_TO_IU_NECK_YAW(t)    (int16_t)(t*(1.0/MOTOR_CONST_NECK_YAW)*AMPS_TO_CURR_IU_NECK)
+#define TORQUE_TO_IU_NECK(t)        (int16_t)((double)t/MOTOR_CONST_NECK*AMPS_TO_CURR_IU_NECK)
+#define TORQUE_TO_IU_NECK_YAW(t)    (int16_t)((double)t/MOTOR_CONST_NECK_YAW*AMPS_TO_CURR_IU_NECK)
 #define IU_TO_TORQUE_NECK(iu)       (double)(iu*MOTOR_CONST_NECK*CURR_IU_TO_AMPS_NECK)
-#define IU_TO_TORQUE_NECK_YAW(iu)   (double)(iu*MOTOR_CONST_NECK*CURR_IU_TO_AMPS_NECK)
+#define IU_TO_TORQUE_NECK_YAW(iu)   (double)(iu*MOTOR_CONST_NECK_YAW*CURR_IU_TO_AMPS_NECK)
 
+// Default position control parameters
+#define EYE_DEFAULT_SPD             (1.5) // rad/s
+#define EYE_DEFAULT_ACCEL           (1.5) // rad/s^2
+#define NECK_DEFAULT_SPD            (1.5) // m/s
+#define NECK_DEFAULT_ACCEL          (1.5) // m/s^2
 
+// Time conversions
 #define SECS_TO_NANO                (uint64_t)(1000*1000*1000)
+#define SECS_TO_MICRO               (1000*1000)
+
+// Threading constants
 #define CURRENT_TID                 (0)
 #define RX_THREAD_PRIORITY          (10)
 #define TX_THREAD_PRIORITY          (31)
 #define TX_THREAD_SLEEP             (100*1000) // us 
-
 #define CURRENT_PID                 (0)
 #define PROCESS_PRIORITY            (-10)  // -20 (highest) to 19 (lowest)
 
+// Misc
 #define DBG_BUFF_SIZE               (255)
 #define SEM_NOTSHARED               (0)
 #define SYNC_TRIES                  (8)
@@ -92,9 +104,14 @@
 #ifdef STARTUP_TEST
 #define DEBUG_STARTUP
 #endif
+#define DEBUG_STARTUP
 #define DEBUG_SHUTDOWN
 //#define DEBUG_SYNC
 //#define DEBUG_TX
+//#define DEBUG_NECK_CMD
+//#define DEBUG_EYE_CMD
+#define DEBUG_COMM_ERR
+#define ROBOT_TEST
 //#define DEBUG_RX
 #define ENABLE_LOG
 
@@ -134,9 +151,9 @@ static rawDataLog_t* eyeLogData = NULL;
 static neckData_t neckData;
 static rawDataLog_t* neckLogData = NULL;
 
-typedef void(*rxCallbackFxn)(uint16_t, uint16_t, int32_t);
-void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data);
-void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data);
+typedef void(*rxCallbackFxn)(uint16_t, uint16_t, uint32_t);
+void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, uint32_t data);
+void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, uint32_t data);
 static double get_timestamp();
 
 typedef struct devHandle
@@ -167,6 +184,7 @@ typedef struct devHandle
     rxCallbackFxn	    callback;
     pthread_cond_t      sync_cond;
     pthread_mutex_t     sync_mutex;
+    char*               name;
 
 } devHandle_t;
 
@@ -174,13 +192,17 @@ static devHandle_t eye  = {.fd = -1, .local_ip = LOCAL_IP, .local_port = EYE_LOC
                     .dest_conn_port = CONN_PORT, .dest_cmd_port = CMD_PORT,
                     .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0,
 		            .host_id = HOST_ID, .callback = &EyeRxCallback, 
-                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER};
+                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
+                    .name = "eye"
+};
 
 static devHandle_t neck = {.fd = -1, .local_ip = LOCAL_IP, .local_port = NECK_LOCAL_PORT, .dest_ip = NECK_IP,
                     .dest_conn_port = CONN_PORT, .dest_cmd_port = CMD_PORT,
                     .ack_pend = 0, .cmd_consume_idx = 0, .cmd_produce_idx = 0,
 		            .host_id = HOST_ID, .callback = &NeckRxCallback, 
-                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER};
+                    .sync_cond = PTHREAD_COND_INITIALIZER, .sync_mutex = PTHREAD_MUTEX_INITIALIZER,
+                    .name = "neck"
+};
 
 void* ThreadLogFn(void* input)
 {
@@ -260,7 +282,7 @@ static void add_log_data(rawDataLog_t* log, double time, double data, uint8_t id
     log->index++;
 }
 
-void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
+void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, uint32_t data)
 {
     double time = get_timestamp();
     double converted_data;
@@ -269,7 +291,7 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
     
     // Neck axis id 1-3
     if(axis_id > NUM_NECK_AXIS) {
-        printf("Neck data recvd from invalid axis id %d", axis_id);
+        printf("Neck data recvd from invalid axis id %d\n", axis_id);
         return;
     }
     neckData.time = time;
@@ -277,11 +299,11 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
         case REG_APOS:
             switch (axis_id) {
                 case NECK_YAW_AXIS:
-                    converted_data = IU_TO_RAD_YAW*data;
+                    converted_data = IU_TO_RAD_YAW*(int32_t)data;
                     break;
                 case NECK_PITCH_AXIS:
                 case NECK_ROLL_AXIS:
-                    converted_data = IU_TO_RAD*data;
+                    converted_data = IU_TO_RAD*(int32_t)data;
                     break;
                 default:
                     printf("Unknown neck axis in APOS msg (axis=%d)\n", axis_id);
@@ -297,11 +319,11 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
         case REG_IQ:
             switch(axis_id) {
                 case NECK_YAW_AXIS:
-                    converted_data = IU_TO_TORQUE_NECK_YAW(data);
+                    converted_data = IU_TO_TORQUE_NECK_YAW((int16_t)data);
                     break;
                 case NECK_PITCH_AXIS:
                 case NECK_ROLL_AXIS:
-                    converted_data = IU_TO_TORQUE_NECK(data);
+                    converted_data = IU_TO_TORQUE_NECK((int16_t)data);
                     break;
                 default:
                     printf("Unknown neck axis in IQ msg (axis=%x)\n", axis_id);
@@ -315,6 +337,22 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             neckData.ready[AXISID_TO_DATAIDX(axis_id)] = data;
             // no logging needed return
             return;
+
+        case REG_CER:
+            printf("Neck %d CER: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
+
+        case REG_CSR:
+            printf("Neck %d CSR: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
+
+        case REG_CBR:
+            printf("Neck %d CBR: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
+
         default:
             printf("Unknown neck data returned (reg=%x)\n", reg_addr);
             return;
@@ -337,7 +375,7 @@ void NeckRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
 
 }
 
-void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
+void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, uint32_t data)
 {
     double converted_data;
     uint8_t log_data_type;
@@ -346,36 +384,37 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
     
     // Eye axis ids 1-4
     if(axis_id > NUM_EYE_AXIS) {
-        printf("Eye data recvd from invalid axis id %d", axis_id);
+        printf("Eye data recvd from invalid axis id %d\n", axis_id);
         return;
     }
 
     switch (reg_addr) {
         case REG_APOS:
             log_data_type = EYE_HALL;
-            converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*(int16_t)data;
             eyeCalData.time = time;
             eyeCalData.pos[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_POSERR:
             log_data_type = EYE_POSERR;
-            converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*(int16_t)data;
             eyeCalData.time = time;
             eyeCalData.err[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_TPOS:
             log_data_type = EYE_TARGET;
-            converted_data = IU_TO_M*data;
+            converted_data = IU_TO_M*(int32_t)data;
             eyeCalData.time = time;
             eyeCalData.tpos[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case REG_APOS2:
+        case REG_APOS2_2:
             log_data_type = EYE_ENCODER;
             eyeData.time = time;
-            converted_data = IU_TO_RAD*data;
+            converted_data = IU_TO_RAD*(int32_t)data;
             pthread_mutex_lock(&eyeData.pos[AXISID_TO_DATAIDX(axis_id)].mutex);
             eyeData.pos[AXISID_TO_DATAIDX(axis_id)].pos = converted_data;
             eyeData.pos[AXISID_TO_DATAIDX(axis_id)].time = time;
@@ -385,8 +424,8 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
         case REG_IQ:
             log_data_type = EYE_CURRENT;
             eyeData.time = time;
-            converted_data = IU_TO_FORCE_EYE(data);
-            eyeData.torque[AXISID_TO_DATAIDX(axis_id)] = converted_data;
+            converted_data = IU_TO_FORCE_EYE((int16_t)data);
+            eyeData.force[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             break;
 
         case VAR_CAL_RUN:
@@ -396,11 +435,26 @@ void EyeRxCallback(uint16_t axis_id, uint16_t reg_addr, int32_t data)
             return;
 
 	    case VAR_CAL_APOS2_OFF:
-            eyeCalData.time = time;
-            converted_data = IU_TO_RAD*data;
-            eyeCalData.offset[AXISID_TO_DATAIDX(axis_id)] = converted_data;
+            eyeData.time = time;
+            converted_data = IU_TO_RAD*(int32_t)data;
+            eyeData.offset[AXISID_TO_DATAIDX(axis_id)] = converted_data;
             // No logging, return instead
 	        return;
+
+        case REG_CER:
+            printf("Eye %d CER: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
+
+        case REG_CSR:
+            printf("Eye %d CSR: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
+
+        case REG_CBR:
+            printf("Eye %d CBR: 0x%x\n", axis_id, data);
+            // no logging needed return
+            return;
 
         default:
             printf("Unknown data returned (reg=0x%x)\n", reg_addr);
@@ -590,7 +644,7 @@ void* ThreadTxFunc(void* input)
         sem_wait(&dev->buf_full);
 #ifdef DEBUG_TX
         char frame_str[DBG_BUFF_SIZE];
-        printf("send [%u]: %s\n", dev->cmd_consume_idx, get_msg_str(&(dev->cmd_buf[dev->cmd_consume_idx]), frame_str));
+        printf("%s send [%u]: %s\n", dev->name, dev->cmd_consume_idx, get_msg_str(&(dev->cmd_buf[dev->cmd_consume_idx]), frame_str));
 #endif
         if(SendMessage(&(dev->cmd_buf[dev->cmd_consume_idx]), dev->fd) < 0) {
             printf("Failed to send motor command\n");
@@ -604,11 +658,11 @@ void* ThreadTxFunc(void* input)
         pthread_mutex_lock(&dev->sync_mutex);
         dev->ack_pend++;
         needSync = dev->ack_pend > MAX_ACK_PEND;
+        pthread_mutex_unlock(&dev->sync_mutex);
+        if(needSync) {
 #ifdef DEBUG_SYNC
         printf("Resync required\n");
 #endif
-        pthread_mutex_unlock(&dev->sync_mutex);
-        if(needSync) {
             if(SyncThreads(dev) < 0) {
                 printf("Failed to resync threads\n");
                 break;
@@ -713,8 +767,8 @@ static uint16_t DisconnectDev(devHandle_t* dev)
 #endif
 
     if(dev->rx_buf.RS232_data[0] != DISCONN_RESP) {
-        printf("Unexpected response to disconnect msg %x\n", dev->rx_buf.RS232_data[0]);
-        return CONN_ERR;
+        printf("Unexpected response to disconnect msg 0x%x\n", dev->rx_buf.RS232_data[0]);
+        //return CONN_ERR;
     }
 
     return CONN_OK;
@@ -903,7 +957,7 @@ void __attribute__ ((constructor)) Start(void)
         printf("setpriority failed with errno=%d\n", err);
     }*/
 
-    InitLib(HOST_ID, BAUDRATE_115200);
+    InitLib(HOST_ID, BAUDRATE_1000K);
 
     // Initialize eyeData, neckData and eyeCalData mutexes
     for(int i = 0; i < NUM_EYE_AXIS; i++) {
@@ -920,7 +974,7 @@ void __attribute__ ((constructor)) Start(void)
         }
     }
     
-#ifdef DEBUG_STARTUP
+#ifdef STARTUP_TEST
     // During tests, eye and neck need different ports
     eye.dest_cmd_port = EYE_CMD_PORT;
     eye.dest_conn_port = EYE_CONN_PORT;
@@ -941,11 +995,24 @@ void __attribute__ ((constructor)) Start(void)
 
 void __attribute__ ((destructor)) Cleanup(void)
 {
+#ifndef ROBOT_TEST
+    // Make sure head doesn't flop down on power off
+    InitNeckPosnCtrl();
+    SetNeckPosn((uint8_t)NECK_PITCH_AXIS, -1*M_PI_2);
+    UpdateNeck((uint8_t)NECK_PITCH_AXIS);
+    DisableNeckCtrl();
+    // Wait for messages to be sent out
+    usleep(5*SECS_TO_MICRO);
+    motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
+    SetAxisControl(DEV_NECK, &dest, false);
+    SetAxisControl(DEV_EYE, &dest, false);
+#endif
+    
     ShutdownDev(&eye);
     ShutdownDev(&neck);
     FlushLogs();
 
-    // Initialize eyeData, neckData and eyeCalData mutexes
+    // Destroy eyeData, neckData and eyeCalData mutexes
     int err;
     for(int i = 0; i < NUM_EYE_AXIS; i++) {
        if(pthread_mutex_destroy(&eyeData.pos[i].mutex) != 0) {
@@ -983,7 +1050,6 @@ void DisableEyeCtrl(void)
 {
     motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
     SendGoTo(DEV_EYE, &allMotors, WAIT_LOOP_EYE_IP);
-    SetAxisControl(DEV_EYE, &allMotors, false);
     return;
 }
 
@@ -992,102 +1058,137 @@ void DisableNeckCtrl(void)
 {
     motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
     SendGoTo(DEV_NECK, &allMotors, WAIT_LOOP_NECK_IP);
-    SetAxisControl(DEV_NECK, &allMotors, false);
     return;
-}
-
-#define MAX_FIXED_POINT 32767.999969
-#define MIN_FIXED_POINT -32767.999969
-
-static uint32_t GetFixedPoint(double value)
-{
-    if(value >= MAX_FIXED_POINT  || value <= MIN_FIXED_POINT) {
-        return 0;
-    }
-
-    int16_t whole = (int16_t)floor(value);
-    double fractional = value - whole;
-    uint16_t decimal = fractional*0xFFFF;
-    uint32_t result = ((uint32_t)decimal << 16) | (whole&0xFFFF);
-    return result;
-}
-
-static uint32_t GetLong(int32_t value)
-{
-    uint32_t result = ((uint32_t)value << 16) | ((value>>16)&0xFFFF);
-    return result;
 }
 
 void InitEyePosnCtrl()
 {
     motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
     SendGoTo(DEV_EYE, &allMotors, POSN_LOOP_EYE_IP);
-    //SendSTA(DEV_EYE, &allMotors); automatically done with TUM0
+    SendSTA(DEV_EYE, &allMotors);
     SetModePP(DEV_EYE, &allMotors);
-    SetTUM(DEV_EYE, &allMotors, 0);
+    SetTUM(DEV_EYE, &allMotors, 1);
+    SetCPA(DEV_EYE, &allMotors);
+    SetEyeSpeed(0, EYE_DEFAULT_SPD);
+    SetEyeAccel(0, EYE_DEFAULT_ACCEL);
+    UpdateMotion(DEV_EYE, &allMotors);
     SetAxisControl(DEV_EYE, &allMotors, true);
-    UpdatePosn(DEV_EYE, &allMotors);
 }
 
-void SetEyePos(uint8_t axis, double pos_m)
+void SetEyePosn(uint8_t axis, double pos_m)
 {
-    uint32_t data = GetLong(pos_m*M_TO_IU);
-    motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
+    int32_t data = pos_m*M_TO_IU;
+
+#ifdef DEBUG_EYE_CMD
+    printf("Set eye %d pos 0x%x [iu]\n", axis, (uint32_t)data);
+#endif
+
+    motor_id_t dest;
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+    } else {
+        dest.type = ID_TYPE_AXIS;
+    }
+    dest.id = axis;
     SetVal32(DEV_EYE, &dest, REG_CPOS, data);
+    SetModePP(DEV_EYE, &dest);
 }
 
 void SetEyeSpeed(uint8_t axis, double speed_mps)
 {
-    uint32_t data = GetFixedPoint(speed_mps*MPS_TO_SPEED_IU);
-    motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
+    uint32_t data = DoubleToFixed(speed_mps*MPS_TO_SPEED_IU);
+
+#ifdef DEBUG_EYE_CMD
+    printf("Set eye %d spd 0x%x [iu]\n", axis, data);
+#endif
+
+    motor_id_t dest;
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+    } else {
+        dest.type = ID_TYPE_AXIS;
+    }
+    dest.id = axis;
     SetVal32(DEV_EYE, &dest, REG_CSPD, data);
 }
 
 void SetEyeAccel(uint8_t axis, double accel_mpss)
 {
-    uint32_t data = GetFixedPoint(accel_mpss*MPSS_TO_ACCEL_IU);
-    motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
+    uint32_t data = DoubleToFixed(accel_mpss*MPSS_TO_ACCEL_IU);
+
+#ifdef DEBUG_EYE_CMD
+    printf("Set eye %d accel 0x%x [iu]\n", axis, data);
+#endif
+
+    motor_id_t dest;
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+    } else {
+        dest.type = ID_TYPE_AXIS;
+    }
+    dest.id = axis;
     SetVal32(DEV_EYE, &dest, REG_CACC, data);
 }
 
-void UpdateEyePos()
+void UpdateEye(uint8_t axis)
 {
-    motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
-    UpdatePosn(DEV_EYE, &allMotors);
+    motor_id_t dest;
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+    } else {
+        dest.type = ID_TYPE_AXIS;
+    }
+    dest.id = axis;
+    UpdateMotion(DEV_EYE, &dest);
 }
 
 void InitNeckPosnCtrl()
 {
     motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
-    SendGoTo(DEV_NECK, &allMotors, POSN_LOOP_EYE_IP);
-    //SendSTA(DEV_NECK, &allMotors); automatically done with TUM0
+    SendGoTo(DEV_NECK, &allMotors, POSN_LOOP_NECK_IP);
+    SendSTA(DEV_NECK, &allMotors);
     SetModePP(DEV_NECK, &allMotors);
-    SetTUM(DEV_NECK, &allMotors, 0);
+    SetTUM(DEV_NECK, &allMotors, 1);
+    SetCPA(DEV_NECK, &allMotors);
+    for(int i = 0; i < NUM_NECK_AXIS; i++) {
+        SetNeckSpeed(i+1, NECK_DEFAULT_SPD);
+        SetNeckAccel(i+1, NECK_DEFAULT_ACCEL);
+    }
+    UpdateMotion(DEV_NECK, &allMotors);
     SetAxisControl(DEV_NECK, &allMotors, true);
-    UpdatePosn(DEV_NECK, &allMotors);
 }
 
-void SetNeckPos(uint8_t axis, double pos_rad)
+void SetNeckPosn(uint8_t axis, double pos_rad)
 {
-    uint32_t data;
+    int32_t data;
     if (axis == NECK_YAW_AXIS) {
-        data = GetLong(pos_rad*RAD_TO_IU_YAW);
+        data = pos_rad*RAD_TO_IU_YAW;
     } else {
-        data = GetLong(pos_rad*RAD_TO_IU);
-    }        
+        data = pos_rad*RAD_TO_IU;
+    }
+
+#ifdef DEBUG_NECK_CMD
+    printf("Set neck %d pos: 0x%x [iu]\n", axis, (uint32_t)data);
+#endif
 
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal32(DEV_NECK, &dest, REG_CPOS, data);
+    SetModePP(DEV_NECK, &dest);
 }
 
 void SetNeckSpeed(uint8_t axis, double speed_rps)
 {
     uint32_t data;
     if(axis == NECK_YAW_AXIS) {
-        data = GetFixedPoint(speed_rps*RADPS_TO_SPEED_IU_YAW);
+        data = DoubleToFixed(speed_rps*RADPS_TO_SPEED_IU_YAW);
     } else {
-        data = GetFixedPoint(speed_rps*RADPS_TO_SPEED_IU);
+        data = DoubleToFixed(speed_rps*RADPS_TO_SPEED_IU);
     }
+
+#ifdef DEBUG_NECK_CMD
+    printf("Set neck %d spd: 0x%x [iu]\n", axis, data);
+#endif
+
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal32(DEV_NECK, &dest, REG_CSPD, data);
 }
@@ -1096,18 +1197,29 @@ void SetNeckAccel(uint8_t axis, double accel_rpss)
 {
     uint32_t data;
     if(axis == NECK_YAW_AXIS) {
-        data = GetFixedPoint(accel_rpss*RADPSS_TO_ACCEL_IU_YAW);
+        data = DoubleToFixed(accel_rpss*RADPSS_TO_ACCEL_IU_YAW);
     } else {
-        data = GetFixedPoint(accel_rpss*RADPSS_TO_ACCEL_IU);
-    }      
+        data = DoubleToFixed(accel_rpss*RADPSS_TO_ACCEL_IU);
+    }
+
+#ifdef DEBUG_NECK_CMD
+    printf("Set neck %d accel: 0x%x [iu]\n", axis, data);
+#endif
+
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal32(DEV_NECK, &dest, REG_CACC, data);
 }
 
-void UpdateNeckPos()
+void UpdateNeck(uint8_t axis)
 {
-    motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
-    UpdatePosn(DEV_NECK, &allMotors);
+    motor_id_t dest;
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+    } else {
+        dest.type = ID_TYPE_AXIS;
+    }
+    dest.id = axis;
+    UpdateMotion(DEV_NECK, &dest);
 }
 
 void StartEyeCal(uint8_t axis, double pos_m)
@@ -1116,7 +1228,7 @@ void StartEyeCal(uint8_t axis, double pos_m)
         return;
     }
 
-    SetEyePos(axis, pos_m);
+    SetEyePosn(axis, pos_m);
     eyeCalData.complete[axis-1] = CAL_RUNNING;
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = 1};
 
@@ -1128,56 +1240,91 @@ void StartEyeCal(uint8_t axis, double pos_m)
     }
 }
 
-void InitEyeForceCtrl()
+void InitEyeForceCtrl(uint8_t axis)
 {
-    motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
-    SendGoTo(DEV_EYE, &allMotors, FORCE_LOOP_EYE_IP);
-    // Set to initial forces
-    for(uint8_t i = 0; i < NUM_NECK_AXIS; i++) {
-        // axis id start at 1
-        SetEyeForce(i+1, 0);
+    motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
+    if(axis == 0) {
+        dest.type = ID_TYPE_BROADCAST;
+        dest.id = 0;
+        SendGoTo(DEV_EYE, &dest, FORCE_LOOP_EYE_IP);
+        usleep(1*SECS_TO_MICRO);
+        for(uint8_t i = 0; i < NUM_EYE_AXIS; i++) {
+            // axis id start at 1
+            SetEyeForce(i+1, eyeData.force[i]);
+        }    
+    } else if(axis >= 1 && axis <= NUM_EYE_AXIS) {
+        dest.type = ID_TYPE_AXIS;
+        dest.id = axis;
+        SendGoTo(DEV_EYE, &dest, FORCE_LOOP_EYE_IP);
+        usleep(1*SECS_TO_MICRO);
+        SetEyeForce(axis, eyeData.force[AXISID_TO_DATAIDX(axis)]);
     }
-    SetExtRefOnline(DEV_EYE, &allMotors);
-    SetModeTorqueSlow(DEV_EYE, &allMotors);
-    SetAxisControl(DEV_EYE, &allMotors, true);
+    SetExtRefOnline(DEV_EYE, &dest);
+    SetModeTorqueSlow(DEV_EYE, &dest);
     
     // Update all 
-    UpdatePosn(DEV_EYE, &allMotors);    
+    UpdateMotion(DEV_EYE, &dest);
+    SetAxisControl(DEV_EYE, &dest, true);
 }
 
 void SetEyeForce(uint8_t axis, double force_n)
 {
-    uint16_t data;
+    int16_t data;
     data = FORCE_TO_IU_EYE(force_n);
+
+#ifdef DEBUG_EYE_CMD
+    printf("Set eye %d force 0x%x [iu]\n", axis, data);
+#endif
+
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal16(DEV_EYE, &dest, REG_EREFT, data);
 }
 
-void InitNeckTorqueCtrl()
+void InitNeckTorqueCtrl(uint8_t axis)
 {
-    motor_id_t allMotors = {.type = ID_TYPE_BROADCAST, .id = 0};
-    SendGoTo(DEV_NECK, &allMotors, TORQUE_LOOP_NECK_IP);
-    // Set initial torques
-    for(uint8_t i = 0; i < NUM_EYE_AXIS; i++) {
-        // axis id start at 1
-        SetNeckTorque(i+1, 0);
+    motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
+    if(axis == 0) {
+        // Broadcast message
+        dest.type = ID_TYPE_BROADCAST;
+        dest.id = 0;
+        SendGoTo(DEV_NECK, &dest, POSN_LOOP_NECK_IP);
+        // Wait for messages to come in
+        usleep(1*SECS_TO_MICRO);
+        // Set to current torques
+        for(uint8_t i = 0; i < NUM_NECK_AXIS; i++) {
+            // axis id start at 1
+            SetNeckTorque(i+1, neckData.torque[i]);
+        }
+    } else if(axis >= 1 && axis <= NUM_NECK_AXIS) {
+        dest.type = ID_TYPE_AXIS;
+        dest.id = axis;
+        SendGoTo(DEV_NECK, &dest, POSN_LOOP_NECK_IP);
+        // Wait for messages to come in
+        usleep(1*SECS_TO_MICRO);
+        //Set to current torque
+        SetNeckTorque(axis, neckData.torque[AXISID_TO_DATAIDX(axis)]);
     }
-    SetExtRefOnline(DEV_NECK, &allMotors);
-    SetModeTorqueSlow(DEV_NECK, &allMotors);
-    SetAxisControl(DEV_NECK, &allMotors, true);
+    SetExtRefOnline(DEV_NECK, &dest);
+    SetModeTorqueSlow(DEV_NECK, &dest);
 
     // Update everything
-    UpdatePosn(DEV_NECK, &allMotors);
+    UpdateMotion(DEV_NECK, &dest);
+    SetAxisControl(DEV_NECK, &dest, true);
 }
 
 void SetNeckTorque(uint8_t axis, double torque_nm)
 {
-    uint16_t data;
+    int16_t data;
     if(axis == NECK_YAW_AXIS) {
         data = TORQUE_TO_IU_NECK_YAW(torque_nm);
     } else {
         data = TORQUE_TO_IU_NECK(torque_nm);
     }
+
+#ifdef DEBUG_NECK_CMD
+    printf("Set neck %d torque: %f [nm] 0x%x [iu]\n", axis, torque_nm, (uint16_t)data);
+#endif
+
     motor_id_t dest = {.type = ID_TYPE_AXIS, .id = axis};
     SetVal16(DEV_NECK, &dest, REG_EREFT, data);
 }
