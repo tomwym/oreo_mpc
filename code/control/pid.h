@@ -12,10 +12,9 @@ typedef struct _lim_t {
 typedef void(*setTorqueFn)(uint8_t, double);
 
 typedef struct _pid_param_t {
-    uint8_t kp;
-    uint8_t ki;
-    uint8_t kd;
-    lim_t integ_lim;
+    double kp;
+    double ki;
+    double kd;
     lim_t cmd_lim;
     lim_t pos_lim;
 } pid_param_t;
@@ -24,11 +23,11 @@ typedef struct _pid_loop_t {
     pid_param_t param;
     double errSum;
     double prevErr;
-    double target;
     double prevTime;
+    double integ;
 } pid_loop_t;
 
 void StartMotion(pid_loop_t* loop, double initTime);
-double UpdateLoop(pid_loop_t* loop, double pos, double time);
+double UpdateLoop(pid_loop_t* loop, double targetPos, double currPos, double time);
 
 #endif
