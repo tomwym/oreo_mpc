@@ -13,7 +13,7 @@
 #define LOG_FILELEN                 (15)
 #define EYE_LOG_FILENAME            ("./eye_log.csv")
 #define NECK_LOG_FILENAME           ("./neck_log.csv")
-#define MAX_ACK_PEND 		        (8)  //limit how much we pound the drives with polls for data
+#define MAX_ACK_PEND 		        (12)          //limit how much we pound the drives with polls for data
 #define MAX_CMD_PEND 		        (uint8_t)(8)  //must be a power of 2
 
 #define CONN_MSG1		            ((uint8_t[]){0x01,0xA4,0x06})

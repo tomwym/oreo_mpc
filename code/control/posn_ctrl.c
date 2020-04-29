@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include <errno.h>
+#include <math.h>
 
 #include "pid.h"
 #include "libmacaque_RS232/macaque_linux.h"
@@ -17,16 +18,17 @@
 static eyeCalData_t* eyeCalData = NULL;
 static eyeData_t* eyeData = NULL;
 static neckData_t* neckData = NULL;
-#ifndef DEBUG_MENU
-static double eyeCalPos[NUM_EYE_AXIS] = {10, 10, 10, 10};
+
+#ifndef M_PI
+    #define M_PI                        ((double)3.14159265358979323846)
 #endif
 
-#define EYE_POS_LIM                 {.low = 0, .high = 10}
-#define NECK_POS_LIM                {.low = 0, .high = 10}
-#define NECK_YAW_POS_LIM            {.low = 0, .high = 10}
-#define EYE_TORQUE_LIM              {.low = 0, .high = 10}
-#define NECK_TORQUE_LIM             {.low = 0, .high = 10}
-#define NECK_YAW_TORQUE_LIM         {.low = 0, .high = 10}
+#define EYE_POS_LIM                 {.low = -0.025, .high = 0.025} // 60e-3m stroke
+#define NECK_POS_LIM                {.low = -1*M_PI/2.0, .high = M_PI/2.0}
+#define NECK_YAW_POS_LIM            {.low = -1*M_PI/2.0, .high = M_PI/2.0}
+#define EYE_FORCE_LIM               {.low = -8, .high = 8} // max force = 10.288 N
+#define NECK_TORQUE_LIM             {.low = -0.85, .high = 0.85} // max torque = 0.88125 Nm
+#define NECK_YAW_TORQUE_LIM         {.low = -0.015, .high = 0.015} // max torque = 0.019575 Nm
 #define HOME_EYE_SPD                (1.5) // rad/s
 #define HOME_EYE_ACCEL              (1.5) // rad/s^2
 #define HOME_NECK_SPD               (1.5) // rad/s
@@ -51,22 +53,22 @@ static pid_loop_t pid_neck_roll = {
 };
 
 static pid_loop_t pid_left_eye_pitch = {
-    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
+    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_FORCE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .integ = 0, .prevTime = 0
 };
 
 static pid_loop_t pid_left_eye_yaw = {
-    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
+    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_FORCE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .integ = 0, .prevTime = 0
 };
 
 static pid_loop_t pid_right_eye_pitch = {
-    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
+    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_FORCE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .integ = 0, .prevTime = 0
 };
 
 static pid_loop_t pid_right_eye_yaw = {
-    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_TORQUE_LIM, .pos_lim = EYE_POS_LIM},
+    .param = {.kp = 0, .ki = 0, .kd = 0, .cmd_lim = EYE_FORCE_LIM, .pos_lim = EYE_POS_LIM},
     .errSum = 0, .prevErr = 0, .integ = 0, .prevTime = 0
 };
 

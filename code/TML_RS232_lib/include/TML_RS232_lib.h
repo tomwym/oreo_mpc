@@ -28,12 +28,12 @@
 // Common instruction pointer addresses
 #define POSN_LOOP_EYE_IP		0x4025u     // Motion(eye) loop
 #define WAIT_LOOP_EYE_IP		0x401Eu     // Wait(eye) loop
-#define FORCE_LOOP_EYE_IP       0x402Au     // Torque control loop
+#define FORCE_LOOP_EYE_IP       0x402Fu     // Torque control loop
 #define POSN_LOOP_NECK_IP	    0x4043u     // Motion(neck) loop
 #define WAIT_LOOP_NECK_IP	    0x403Cu     // Wait(neck) loop
-#define TORQUE_LOOP_NECK_IP     0x4048u     // Torque control loop
-#define REV_CAL_EYE_IP          0x4069u     // Reverse calibration
-#define FOR_CAL_EYE_IP	        0x402Fu     // Forward calibration
+#define TORQUE_LOOP_NECK_IP     0x404Du     // Torque control loop
+#define REV_CAL_EYE_IP          0x4073u     // Reverse calibration
+#define FOR_CAL_EYE_IP	        0x4039u     // Forward calibration
 
 // type of id
 typedef enum {

@@ -104,7 +104,6 @@ int main()
 {
     motor_id_t dest = {.type = ID_TYPE_BROADCAST, .id = 0};
     ResetFaults(DEV_NECK, &dest);
-    SetBaudRate(DEV_NECK, BAUDRATE_1000K);
     neck_ctrl();
     SendGiveMeData2(DEV_NECK, &dest, REG_CER, true);
     SendGiveMeData2(DEV_NECK, &dest, REG_CSR, true);

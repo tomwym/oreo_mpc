@@ -49,15 +49,15 @@ void eye_ctrl()
 {
     pid_loop_t pitch_loop = {
         .param = {.kp = 0.0001, .ki = 0.00001, .kd = 0, 
-        .cmd_lim = {.low = -0.015, .high = 0.015}, 
-        .pos_lim = {.low = 0, .high = 10}},
+        .cmd_lim = {.low = -8.0, .high = 8.0}, 
+        .pos_lim = {.low = -0.025, .high = 0.025}},
         .errSum = 0, .prevErr = 0, .prevTime = 0
     };
 
     pid_loop_t yaw_loop = {
         .param = {.kp = 0.0001, .ki = 0.00001, .kd = 0, 
-        .cmd_lim = {.low = -0.015, .high = 0.015}, 
-        .pos_lim = {.low = 0, .high = 10}},
+        .cmd_lim = {.low = -8.0, .high = 8.0}, 
+        .pos_lim = {.low = -0.025, .high = 0.025}},
         .errSum = 0, .prevErr = 0, .prevTime = 0
     };
 
