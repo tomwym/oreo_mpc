@@ -56,4 +56,5 @@ The application provides a cmd line interface for the user to control the operat
 	
 The target positions should be order in ascending axis id's. The order of the rows can be switched as needed.
 
-## Motor Controller Setup
+## Future Work
+Some basic testing on the communication library has been completed to verify functionality. This if far from comprehensive. A more complete testing operation should be done to ensure correctness of both main functionality and to cover any edge cases that may exist. Once complete, tuning the position and torque pid loops can commence using the starter code provided in this repo.
