@@ -1,11 +1,4 @@
-# oreo_sim
-oreo robot simulation workspace
+hello world ! 
 
-# Four Bar Linkage
-an example showing how to use constraints to close kinematic loops
+clone of https://github.com/jhzhu8/oreo_sim
 
-# joint_state_publisher
-ROS package allowing for joint control within RViz
-
-# oreo
-URDF modelling and Pybullet sim of oreo robot

@@ -35,14 +35,16 @@ class Oreo_Robot(object):
     CONS_PARENT_IDX = 0
     CONS_CHILD_IDX = 1
     CONS_NAME_IDX = 2
-    constraintParentPos = [[0.015, -0.0016, 0.0245], [0.0126, -0.0257, 0.0095], [0.0134, 0.0025, 0.0262], [0.0143, -0.0224, 0.0124]] # pos on eye
+    constraintParentPos = [[0.015, -0.0016, 0.0245], [0.0126, -0.0257, 0.0095],
+                           [0.0134, 0.0025, 0.0262], [0.0143, -0.0224, 0.0124]] # pos on eye
     constraintChildPos = [30.25e-3, 0, 0]   # pos on dogbone
     constraintAxis = [0,0,0]
     constraintType = p.JOINT_POINT2POINT
 
     # Joints modelled with motor
-    actJointNames = ["neck_joint", "pitch_piece_joint", "skull_joint", "linear_motor_rod_joint_far_left", "linear_motor_rod_joint_mid_left", \
-                "linear_motor_rod_joint_mid_right", "linear_motor_rod_joint_far_right"]
+    actJointNames = ["neck_joint", "pitch_piece_joint", "skull_joint",
+                     "linear_motor_rod_joint_far_left", "linear_motor_rod_joint_mid_left",
+                     "linear_motor_rod_joint_mid_right", "linear_motor_rod_joint_far_right"]
     actJointIds = []
     actJointPos = []
     actJointNum = 0
@@ -55,7 +57,8 @@ class Oreo_Robot(object):
     actJointControl = p.POSITION_CONTROL
 
     # "Dumb" joints with no actuation
-    dumbJointNames = ["left_eye_yolk_joint", "left_eye_joint", "right_eye_yolk_joint", "right_eye_joint"]
+    dumbJointNames = ["left_eye_yolk_joint", "left_eye_joint",
+                      "right_eye_yolk_joint", "right_eye_joint"]
     dumbJointHome = 0
     dumbJointIds = 0
     dumbJointNum = 0
@@ -64,8 +67,10 @@ class Oreo_Robot(object):
     dumbJointForce = 0
 
     # "Spherical" joints (no actuation)
-    spherJointNames = ["dogbone_joint_far_left", "dogbone_joint_mid_left", "dogbone_joint_mid_right", "dogbone_joint_far_right"]
-    spherJointHome = [[0, 0, 0.00427], [0, 0, 0.00427], [0, 0, 0.00427], [0, 0, -0.00427], [0, 0, -0.00427]]
+    spherJointNames = ["dogbone_joint_far_left", "dogbone_joint_mid_left", 
+                       "dogbone_joint_mid_right", "dogbone_joint_far_right"]
+    spherJointHome = [[0, 0, 0.00427], [0, 0, 0.00427], [0, 0, 0.00427],
+                      [0, 0, -0.00427], [0, 0, -0.00427]]
     spherJointIds = []
     spherJointNum = 0
     spherJointPos = [0]
@@ -109,13 +114,13 @@ class Oreo_Robot(object):
     JOINT_MAX_FORCE = 100
     TORQUE_CONTROL = 0
     POSITION_CONTROL = 1
-    TIME_STEP = 1/240
+    TIME_STEP = 1/360
     DYN_STATE_SIZE = 6
     GRAV_ACCELZ = -9.8
 
 
     # Constructor
-    def __init__(self, enableDebug, enableGUI, urdfPath, urdfName, enableRealTime) :
+    def __init__(self, enableDebug, enableGUI, urdfPath, urdfName, enableRealTime ,dt) :
         # Init logging
         if(enableDebug) :
             logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
@@ -133,6 +138,7 @@ class Oreo_Robot(object):
         urdf_flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER | p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS
         self.linkage = p.loadURDF(urdfName, self.INIT_POS, p.getQuaternionFromEuler(self.INIT_ORN), useFixedBase = 1, flags = urdf_flags)
         self.useRealTime = enableRealTime
+        self.TIME_STEP = dt
 
     # Go to home position
     def HomePos(self) :
@@ -168,7 +174,6 @@ class Oreo_Robot(object):
             p.setCollisionFilterPair(bodyUniqueIdA = self.linkage, bodyUniqueIdB = self.linkage, linkIndexA = self.jointDict[self.toggCollisionLinks[i][0]], linkIndexB = self.jointDict[self.toggCollisionLinks[i][1]], enableCollision = 1)
             if enable > 0:
                 logging.debug("Collision pair: %s %s", self.toggCollisionLinks[i][0], self.toggCollisionLinks[i][1])
-        print()
         print()
     
     # Toggle Sim type
@@ -239,6 +244,8 @@ class Oreo_Robot(object):
         if self.useRealTime == False :
             p.stepSimulation()
 
+        #print('in ControlActJoints', 'links:', links, 'forces:', target)
+
         return 0
 
     # Set joint control for dumb joints
@@ -279,10 +286,10 @@ class Oreo_Robot(object):
             self.jointDict[jointInfo[1].decode('UTF-8')] = i
 
             # record parent and child ids for each joint [child, parent]
-#            self.linkJoints.append([[jointInfo[16]], [i]])
+            # self.linkJoints.append([[jointInfo[16]], [i]])
             # ignore the dummy link
-#            if(i > 0) :
-#                self.linkJoints[jointInfo[16]][self.LINK_PARENT_IDX].append(jointInfo[16])
+            # if(i > 0) :
+            # self.linkJoints[jointInfo[16]][self.LINK_PARENT_IDX].append(jointInfo[16])
 
             # measure force/torque at the joints
             p.enableJointForceTorqueSensor(self.linkage, i, enableSensor = True)
@@ -330,9 +337,9 @@ class Oreo_Robot(object):
             self.constraintDict[self.constraintLinks[i][self.CONS_NAME_IDX]] =  p.createConstraint(self.linkage, parent_id, self.linkage, child_id, self.constraintType, self.constraintAxis, self.constraintParentPos[i],  self.constraintChildPos)
             p.changeConstraint(self.constraintDict[self.constraintLinks[i][self.CONS_NAME_IDX]], maxForce = self.CONSTRAINT_MAX_FORCE)
 
-#            # Add to linkJoint list (make constraints -ve ids)
-#            self.linkJoints[parent_id][self.LINK_PARENT_IDX].append(parent_id*-1)
-#            self.linkJoints[child_id][self.LINK_CHILD_IDX].append(child_id*-1)
+            # Add to linkJoint list (make constraints -ve ids)
+            # self.linkJoints[parent_id][self.LINK_PARENT_IDX].append(parent_id*-1)
+            # self.linkJoints[child_id][self.LINK_CHILD_IDX].append(child_id*-1)
 
         # Set joint control
         self.SetActJointControlType(self.POSITION_CONTROL)

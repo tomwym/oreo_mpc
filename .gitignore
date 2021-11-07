@@ -1,0 +1,13 @@
+*.vscode
+*__pycache__
+oreo/sim/dat
+oreo/sim/pix
+oreo/sim/path_archs
+oreo/sim/getXi
+oreo/sim/init.dat
+oreo/sim/oscillating_masses.py
+oreo/sim/runm
+oreo/sim/temp
+*.csv
+*.txt
+*.dat

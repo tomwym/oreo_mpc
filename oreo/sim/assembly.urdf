@@ -60,7 +60,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="neck_joint" type="continuous">
+    <joint name="neck_joint" type="fixed">
         <origin xyz="35.81e-3 -0.67e-3 -2.27e-3" rpy="0 0 0"/>
         <axis xyz="0 0 1" rpy="0 0 0"/>
         <parent link="base_link"/>
@@ -87,7 +87,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="pitch_piece_joint" type="continuous">
+    <joint name="pitch_piece_joint" type="fixed">
         <origin xyz="0 44.45e-3 174.99e-3" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
         <parent link="neck_link"/>
@@ -114,7 +114,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="skull_joint" type="continuous">
+    <joint name="skull_joint" type="fixed">
         <origin xyz="28.58e-3 -44.45e-3 0" rpy="0 0 0"/>
         <axis xyz="1 0 0"/>
         <parent link="pitch_piece_link"/>
@@ -197,7 +197,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="linear_motor_rod_joint_mid_right" type="prismatic">
+    <joint name="linear_motor_rod_joint_mid_right" type="fixed">
         <origin xyz="-63.32e-3 -14.5e-3 32.08e-3" rpy="0 -0.30682 0"/>
         <axis xyz="1 0 0"/>
         <limit effort="30" velocity="1.0" lower="-23.4e-3" upper="23.4e-3"/> 
@@ -225,7 +225,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="linear_motor_rod_joint_far_right" type="prismatic">
+    <joint name="linear_motor_rod_joint_far_right" type="fixed">
         <origin xyz="-63.32e-3 -43.5e-3 32.08e-3" rpy="0 -0.30682 0"/>
         <axis xyz="1 0 0"/>
         <limit effort="30" velocity="1.0" lower="-23.4e-3" upper="23.4e-3"/> 

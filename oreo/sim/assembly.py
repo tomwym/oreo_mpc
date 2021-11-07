@@ -14,9 +14,9 @@ else:
     logging.info('LOG_LEVEL: INFO')
 
 # Setup environment
-physicsClient = p.connect(p.GUI)
-#physicsClient = p.connect(p.DIRECT)
-p.setAdditionalSearchPath("/home/oreo/Documents/oreo_sim/oreo/sim")
+#physicsClient = p.connect(p.GUI)
+physicsClient = p.connect(p.DIRECT)
+p.setAdditionalSearchPath("~/dev/oreo/oreo_sim/oreo/sim")
 p.setRealTimeSimulation(0)
 startPos = [0,0,0]
 startOrn = p.getQuaternionFromEuler([0,0,0])
@@ -94,29 +94,29 @@ p.changeConstraint(cid_mid_right, maxForce = 100)
 # Enable joint control (actuating joints are position control, rest are velo control)
 ctrl_mode = p.POSITION_CONTROL
 maxforce = 100
-p.setJointMotorControl2(linkage, jointInfoList['neck_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
-p.setJointMotorControl2(linkage, jointInfoList['pitch_piece_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
+# p.setJointMotorControl2(linkage, jointInfoList['neck_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
+# p.setJointMotorControl2(linkage, jointInfoList['pitch_piece_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_left'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_left'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_right'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
 p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_right'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
-p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
-p.setJointMotorControl2(linkage, jointInfoList['left_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
-p.setJointMotorControl2(linkage, jointInfoList['left_eye_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
-p.setJointMotorControl2(linkage, jointInfoList['right_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
-p.setJointMotorControl2(linkage, jointInfoList['right_eye_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
+# p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = 0, controlMode = ctrl_mode, force = maxforce)
+# p.setJointMotorControl2(linkage, jointInfoList['left_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
+# p.setJointMotorControl2(linkage, jointInfoList['left_eye_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
+# p.setJointMotorControl2(linkage, jointInfoList['right_eye_yolk_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
+# p.setJointMotorControl2(linkage, jointInfoList['right_eye_joint'], controlMode = p.VELOCITY_CONTROL, force = 0)
 
 # Spherical joint control
-p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_far_left'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
-p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_mid_left'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
-p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_mid_right'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
-p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_far_right'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
+# p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_far_left'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
+# p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_mid_left'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
+# p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_mid_right'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
+# p.setJointMotorControlMultiDof(linkage, jointInfoList['dogbone_joint_far_right'], controlMode = p.POSITION_CONTROL, targetPosition = [0], targetVelocity = [0, 0, 0], positionGain = 0, velocityGain = 1, force = [0,0,0])
 
 
 # Create debug window to control joints
-neck_ctrl = p.addUserDebugParameter("neck_joint", -1.57, 1.57, 0)
-pitch_piece_ctrl = p.addUserDebugParameter("pitch_piece_joint", -1.57, 1.57, 0)
-skull_ctrl = p.addUserDebugParameter("skull_joint", -1.57, 1.57, 0)
+# neck_ctrl = p.addUserDebugParameter("neck_joint", -1.57, 1.57, 0)
+# pitch_piece_ctrl = p.addUserDebugParameter("pitch_piece_joint", -1.57, 1.57, 0)
+# skull_ctrl = p.addUserDebugParameter("skull_joint", -1.57, 1.57, 0)
 linear_motor_far_left_ctrl = p.addUserDebugParameter("motor_rod_joint_far_left", -0.1, 0.1, 0)
 linear_motor_mid_left_ctrl = p.addUserDebugParameter("motor_rod_joint_mid_left", -0.1, 0.1, 0)
 linear_motor_far_right_ctrl = p.addUserDebugParameter("motor_rod_joint_far_right", -0.1, 0.1, 0)
@@ -145,13 +145,13 @@ while (1):
     skull_posn = p.readUserDebugParameter(skull_ctrl)
 
     # Set joints to user-defined positions
-    p.setJointMotorControl2(linkage, jointInfoList['neck_joint'], targetPosition = neck_posn, controlMode = ctrl_mode, force = maxforce)
-    p.setJointMotorControl2(linkage, jointInfoList['pitch_piece_joint'], targetPosition = pitch_piece_posn, controlMode = ctrl_mode, force = maxforce)
+    # p.setJointMotorControl2(linkage, jointInfoList['neck_joint'], targetPosition = neck_posn, controlMode = ctrl_mode, force = maxforce)
+    # p.setJointMotorControl2(linkage, jointInfoList['pitch_piece_joint'], targetPosition = pitch_piece_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_left'], targetPosition = linear_motor_far_left_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_left'], targetPosition = linear_motor_mid_left_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_mid_right'], targetPosition = linear_motor_mid_right_posn, controlMode = ctrl_mode, force = maxforce)
     p.setJointMotorControl2(linkage, jointInfoList['linear_motor_rod_joint_far_right'], targetPosition = linear_motor_far_right_posn, controlMode = ctrl_mode, force = maxforce)
-    p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = skull_posn, controlMode = ctrl_mode, force = maxforce)
+    # p.setJointMotorControl2(linkage, jointInfoList['skull_joint'], targetPosition = skull_posn, controlMode = ctrl_mode, force = maxforce)
     
     if useRealTime == False :
         #events = p.getMouseEvents()
