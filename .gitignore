@@ -1,13 +1,75 @@
+# from toms work
 *.vscode
 *__pycache__
-oreo/sim/dat
-oreo/sim/pix
-oreo/sim/path_archs
-oreo/sim/getXi
-oreo/sim/init.dat
-oreo/sim/oscillating_masses.py
-oreo/sim/runm
-oreo/sim/temp
+sim/dat
+sim/pix
+sim/path_archs
+sim/getXi
+sim/init.dat
+sim/oscillating_masses.py
+sim/runm
+sim/temp
 *.csv
 *.txt
 *.dat
+
+# from before
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# VSCode
+*.json
+*.code-workspace
+
+# Random files
+serial_tests
